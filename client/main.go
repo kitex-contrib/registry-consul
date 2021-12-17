@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	consul "github.com/hanson/registry-consul"
+	consul "github.com/kitex-contrib/registry-consul"
 	"log"
 	"time"
 

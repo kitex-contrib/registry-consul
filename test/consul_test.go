@@ -15,12 +15,13 @@ package test
 
 import (
 	"context"
+	"net"
+	"testing"
+
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	consul "github.com/kitex-contrib/registry-consul"
 	"github.com/stretchr/testify/assert"
-	"net"
-	"testing"
 )
 
 func TestConsulDiscovery(t *testing.T) {

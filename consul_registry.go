@@ -16,10 +16,11 @@ package consul
 
 import (
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/registry"
-	"github.com/hashicorp/consul/api"
 	"net"
 	"strconv"
+
+	"github.com/cloudwego/kitex/pkg/registry"
+	"github.com/hashicorp/consul/api"
 )
 
 type consulRegistry struct {

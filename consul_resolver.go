@@ -17,11 +17,12 @@ package consul
 import (
 	"context"
 	"fmt"
+	"log"
+
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/hashicorp/consul/api"
-	"log"
 )
 
 const (

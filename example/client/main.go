@@ -16,9 +16,10 @@ package main
 
 import (
 	"context"
-	consul "github.com/kitex-contrib/registry-consul"
 	"log"
 	"time"
+
+	consul "github.com/kitex-contrib/registry-consul"
 
 	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api"
 	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api/hello"

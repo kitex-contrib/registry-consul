@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/hashicorp/consul/api"
+	"net"
+	"strconv"
 )
 
 type consulRegistry struct {
@@ -70,12 +72,29 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 
 	if c.registration == nil {
 		c.registration = &api.AgentServiceRegistration{
-			Name:    info.ServiceName,
-			Address: info.Addr.String(),
+			Name: info.ServiceName,
 		}
 	} else {
 		c.registration.Name = info.ServiceName
-		c.registration.Address = info.Addr.String()
+	}
+
+	if host, port, err := net.SplitHostPort(info.Addr.String()); err == nil {
+		if port == "" {
+			return fmt.Errorf("registry info addr missing port")
+		}
+		if host == "" || host == "::" {
+			ipv4, err := GetLocalIPv4Address()
+			if err != nil {
+				return fmt.Errorf("get local ipv4 error, cause %w", err)
+			}
+			c.registration.Address = ipv4
+		} else {
+			c.registration.Address = host
+		}
+		port, _ := strconv.Atoi(port)
+		c.registration.Port = port
+	} else {
+		return fmt.Errorf("parse registry info addr error")
 	}
 
 	if c.check != nil {

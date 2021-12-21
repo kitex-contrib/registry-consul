@@ -16,6 +16,7 @@ package consul
 
 import (
 	"context"
+	"fmt"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -45,12 +46,13 @@ func (c consulResolver) Resolve(ctx context.Context, desc string) (discovery.Res
 	}
 
 	for _, service := range services {
+		log.Println(service.Address)
 		weight := service.Weights.Passing
 		if weight <= 0 {
 			weight = defaultWeight
 		}
 
-		eps = append(eps, discovery.NewInstance(service.Meta["network"], service.Address, weight, service.Meta))
+		eps = append(eps, discovery.NewInstance(service.Meta["network"], fmt.Sprintf("%s:%d", service.Address, service.Port), weight, service.Meta))
 	}
 
 	return discovery.Result{

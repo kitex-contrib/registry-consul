@@ -31,7 +31,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	client := hello.MustNewClient("Hello", client.WithResolver(r))
+	client := hello.MustNewClient("echo", client.WithResolver(r))
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 		resp, err := client.Echo(ctx, &api.Request{Message: "Hello"})

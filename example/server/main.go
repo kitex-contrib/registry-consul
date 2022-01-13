@@ -58,7 +58,7 @@ func main() {
 	//}
 
 	server := hello.NewServer(new(HelloImpl), server.WithRegistry(r), server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{
-		ServiceName: "Hello",
+		ServiceName: "echo",
 	}))
 	err = server.Run()
 	if err != nil {

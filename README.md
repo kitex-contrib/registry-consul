@@ -1,4 +1,4 @@
-# registry-consul
+# registry-consul (This is a community driven project)
 
 ## Docs
 
@@ -22,7 +22,7 @@ func main() {
     }
     
     server := hello.NewServer(new(HelloImpl), server.WithRegistry(r), server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{
-        ServiceName: "Hello",
+        ServiceName: "echo",
     }))
     err = server.Run()
     if err != nil {
@@ -77,7 +77,7 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    client, err := echo.NewClient("hello", client.WithResolver(r))
+    client, err := echo.NewClient("echo", client.WithResolver(r))
     if err != nil {
         log.Fatal(err)
     }

@@ -87,4 +87,10 @@ func main() {
 
 ## Example
 
-See Server and Client.
+See Server and Client in example.
+
+## Compatibility
+
+Compatible with consul.
+
+maintained by: [Hanson](https://github.com/hanson)

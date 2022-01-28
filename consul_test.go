@@ -16,6 +16,7 @@ package consul
 
 import (
 	"context"
+	"errors"
 	"net"
 	"testing"
 
@@ -24,14 +25,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestConsulDiscovery(t *testing.T) {
-	// register
-	r, err := NewConsulRegister("127.0.0.1:8500")
-	assert.Nil(t, err)
+const (
+	consulAddr  = "127.0.0.1:8500"
+	testSvcName = "test-svc"
+)
+
+func TestNewConsulRegister(t *testing.T) {
+	_, err := NewConsulRegister(consulAddr)
+	assert.NoError(t, err)
+}
+
+func TestRegister(t *testing.T) {
+	c, err := NewConsulRegister(consulAddr)
+	assert.NoError(t, err)
 	tags := map[string]string{"group": "blue", "idc": "hd1"}
 	addr, _ := net.ResolveTCPAddr("tcp", ":9999")
 	info := &registry.Info{ServiceName: "product", Weight: 100, PayloadCodec: "thrift", Tags: tags, Addr: addr}
-	err = r.Register(info)
+	err = c.Register(info)
+	assert.Nil(t, err)
+}
+
+func TestConsulDiscovery(t *testing.T) {
+	c, err := NewConsulRegister(consulAddr)
+	assert.NoError(t, err)
+	tags := map[string]string{"group": "blue", "idc": "hd1"}
+	addr, _ := net.ResolveTCPAddr("tcp", ":9999")
+	info := &registry.Info{ServiceName: "product", Weight: 100, PayloadCodec: "thrift", Tags: tags, Addr: addr}
+	err = c.Register(info)
 	assert.Nil(t, err)
 
 	// resolve
@@ -66,13 +86,10 @@ func TestConsulDiscovery(t *testing.T) {
 	}
 
 	// deregister
-	err = r.Deregister(info)
+	err = c.Deregister(info)
 	assert.Nil(t, err)
 
 	// resolve again
 	result, err = res.Resolve(context.Background(), target)
-	assert.Nil(t, err)
-	if len(result.Instances) != 0 {
-		t.Errorf("instance num mismatch, expect: %d, in fact: %d", 0, len(result.Instances))
-	}
+	assert.Error(t, errors.New("no service found"), err)
 }

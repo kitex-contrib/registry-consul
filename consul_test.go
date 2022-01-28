@@ -48,7 +48,7 @@ func TestConsulDiscovery(t *testing.T) {
 		instance := result.Instances[0]
 		host, port, err := net.SplitHostPort(instance.Address().String())
 		assert.Nil(t, err)
-		local, _ := GetLocalIPv4Address()
+		local, _ := getLocalIPv4Address()
 		if host != local {
 			t.Errorf("instance host is mismatch, expect: %s, in fact: %s", local, host)
 		}

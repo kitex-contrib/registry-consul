@@ -15,6 +15,7 @@
 package consul
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -79,24 +80,27 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 		c.registration.Name = info.ServiceName
 	}
 
-	if host, port, err := net.SplitHostPort(info.Addr.String()); err == nil {
-		if port == "" {
-			return fmt.Errorf("registry info addr missing port")
-		}
-		if host == "" || host == "::" {
-			ipv4, err := GetLocalIPv4Address()
-			if err != nil {
-				return fmt.Errorf("get local ipv4 error, cause %w", err)
-			}
-			c.registration.Address = ipv4
-		} else {
-			c.registration.Address = host
-		}
-		port, _ := strconv.Atoi(port)
-		c.registration.Port = port
-	} else {
-		return fmt.Errorf("parse registry info addr error")
+	host, port, err := net.SplitHostPort(info.Addr.String())
+	if err != nil {
+		return errors.New("parse registry info addr error")
 	}
+	if port == "" {
+		return errors.New("registry info addr missing port")
+	}
+	if host == "" || host == "::" {
+		ipv4, err := getLocalIPv4Address()
+		if err != nil {
+			return fmt.Errorf("get local ipv4 error, cause %w", err)
+		}
+		c.registration.Address = ipv4
+	} else {
+		c.registration.Address = host
+	}
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		return err
+	}
+	c.registration.Port = p
 
 	if c.check != nil {
 		c.check.TCP = info.Addr.String()
@@ -110,27 +114,20 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 	}
 
 	c.registration.Meta["network"] = info.Addr.Network()
-	if info.Weight <= 0 {
-		info.Weight = defaultWeight
-	}
 	c.registration.Weights = &api.AgentWeights{
 		Passing: info.Weight,
 		Warning: 1,
 	}
 
-	if err := c.consulClient.Agent().ServiceRegister(c.registration); err != nil {
-		return err
-	}
-
-	return nil
+	return c.consulClient.Agent().ServiceRegister(c.registration)
 }
 
 func validateRegistryInfo(info *registry.Info) error {
 	if info.ServiceName == "" {
-		return fmt.Errorf("missing service name in Register")
+		return errors.New("missing service name in Register")
 	}
 	if info.Addr == nil {
-		return fmt.Errorf("missing addr in Register")
+		return errors.New("missing addr in Register")
 	}
 	return nil
 }

@@ -9,9 +9,10 @@
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-package test
+package consul
 
 import (
 	"context"
@@ -20,13 +21,12 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	consul "github.com/kitex-contrib/registry-consul"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestConsulDiscovery(t *testing.T) {
 	// register
-	r, err := consul.NewConsulRegister("127.0.0.1:8500")
+	r, err := NewConsulRegister("127.0.0.1:8500")
 	assert.Nil(t, err)
 	tags := map[string]string{"group": "blue", "idc": "hd1"}
 	addr, _ := net.ResolveTCPAddr("tcp", ":9999")
@@ -35,7 +35,7 @@ func TestConsulDiscovery(t *testing.T) {
 	assert.Nil(t, err)
 
 	// resolve
-	res, err := consul.NewConsulResolver("127.0.0.1:8500")
+	res, err := NewConsulResolver("127.0.0.1:8500")
 	assert.Nil(t, err)
 	target := res.Target(context.Background(), rpcinfo.NewEndpointInfo("product", "", nil, nil))
 	result, err := res.Resolve(context.Background(), target)
@@ -48,7 +48,7 @@ func TestConsulDiscovery(t *testing.T) {
 		instance := result.Instances[0]
 		host, port, err := net.SplitHostPort(instance.Address().String())
 		assert.Nil(t, err)
-		local, _ := consul.GetLocalIPv4Address()
+		local, _ := GetLocalIPv4Address()
 		if host != local {
 			t.Errorf("instance host is mismatch, expect: %s, in fact: %s", local, host)
 		}

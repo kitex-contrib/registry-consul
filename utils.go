@@ -1,4 +1,4 @@
-// Copyright 2021 CloudWeGo authors.
+// Copyright 2021 CloudWeGo Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,11 @@
 package consul
 
 import (
-	"fmt"
+	"errors"
 	"net"
 )
 
-func GetLocalIPv4Address() (string, error) {
+func getLocalIPv4Address() (string, error) {
 	addr, err := net.InterfaceAddrs()
 	if err != nil {
 		return "", err
@@ -34,5 +34,5 @@ func GetLocalIPv4Address() (string, error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("not found ipv4 address")
+	return "", errors.New("not found ipv4 address")
 }

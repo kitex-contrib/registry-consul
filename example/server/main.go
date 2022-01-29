@@ -1,4 +1,4 @@
-// Copyright 2021 CloudWeGo authors.
+// Copyright 2021 CloudWeGo Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,10 +52,10 @@ func main() {
 		Tags: []string{"dev"},
 	})
 
-	//r, err := consul.NewConsulRegisterWithConfig(consulapi.DefaultConfig())
-	//if err != nil {
+	// r, err := consul.NewConsulRegisterWithConfig(consulapi.DefaultConfig())
+	// if err != nil {
 	//	log.Fatal(err)
-	//}
+	// }
 
 	server := hello.NewServer(new(HelloImpl), server.WithRegistry(r), server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{
 		ServiceName: "echo",

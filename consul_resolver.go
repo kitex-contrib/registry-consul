@@ -21,7 +21,6 @@ import (
 	"log"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
-	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/hashicorp/consul/api"
 )
@@ -76,8 +75,4 @@ func (c *consulResolver) Diff(cacheKey string, prev, next discovery.Result) (dis
 
 func (c *consulResolver) Name() string {
 	return "consul"
-}
-
-func (c *consulRegistry) Deregister(info *registry.Info) error {
-	return c.consulClient.Agent().ServiceDeregister(info.ServiceName)
 }

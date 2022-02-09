@@ -80,6 +80,8 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 		c.registration.Name = info.ServiceName
 	}
 
+	c.registration.ID = fmt.Sprintf("%s:%s", info.ServiceName, info.Addr.String())
+
 	host, port, err := net.SplitHostPort(info.Addr.String())
 	if err != nil {
 		return errors.New("parse registry info addr error")
@@ -103,7 +105,7 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 	c.registration.Port = p
 
 	if c.check != nil {
-		c.check.TCP = info.Addr.String()
+		c.check.TCP = fmt.Sprintf("%s:%d", host, p)
 		c.registration.Check = c.check
 	}
 
@@ -124,10 +126,14 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 
 func validateRegistryInfo(info *registry.Info) error {
 	if info.ServiceName == "" {
-		return errors.New("missing service name in Register")
+		return errors.New("missing service name in consul register")
 	}
 	if info.Addr == nil {
-		return errors.New("missing addr in Register")
+		return errors.New("missing addr in consul register")
 	}
 	return nil
+}
+
+func (c *consulRegistry) Deregister(info *registry.Info) error {
+	return c.consulClient.Agent().ServiceDeregister(fmt.Sprintf("%s:%s", info.ServiceName, info.Addr.String()))
 }

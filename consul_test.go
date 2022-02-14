@@ -30,21 +30,29 @@ const (
 	testSvcName = "test-svc"
 )
 
+// TestNewConsulRegister tests the NewConsulRegister function.
 func TestNewConsulRegister(t *testing.T) {
 	_, err := NewConsulRegister(consulAddr)
 	assert.NoError(t, err)
 }
 
+// NewConsulRegisterWithConfig tests the NewConsulRegisterWithConfig function.
+func TestNewConsulRegisterWithConfig(t *testing.T) {
+	_, err := NewConsulRegisterWithConfig(&api.config{})
+	assert.NoError(t, err)
+}
+
+// TestRegister tests the Register function.
 func TestRegister(t *testing.T) {
 	c, err := NewConsulRegister(consulAddr)
 	assert.NoError(t, err)
-	tags := map[string]string{"group": "blue", "idc": "hd1"}
 	addr, _ := net.ResolveTCPAddr("tcp", ":9999")
 	info := &registry.Info{ServiceName: "product", Weight: 100, PayloadCodec: "thrift", Tags: tags, Addr: addr}
 	err = c.Register(info)
 	assert.Nil(t, err)
 }
 
+// TestConsulDiscovery tests the ConsulDiscovery function.
 func TestConsulDiscovery(t *testing.T) {
 	c, err := NewConsulRegister(consulAddr)
 	assert.NoError(t, err)
@@ -92,4 +100,9 @@ func TestConsulDiscovery(t *testing.T) {
 	// resolve again
 	result, err = res.Resolve(context.Background(), target)
 	assert.Error(t, errors.New("no service found"), err)
+}
+
+// TestMultiServicesRegister tests the Register function, register multiple services, then deregister one of them.
+func TestMultiServicesRegister(t *testing.T) {
+
 }

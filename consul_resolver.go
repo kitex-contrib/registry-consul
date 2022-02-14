@@ -29,6 +29,7 @@ type consulResolver struct {
 	consulClient *api.Client
 }
 
+// NewConsulResolver create a service resolver using consul.
 func NewConsulResolver(address string) (discovery.Resolver, error) {
 	config := api.DefaultConfig()
 	config.Address = address
@@ -40,10 +41,12 @@ func NewConsulResolver(address string) (discovery.Resolver, error) {
 	return &consulResolver{consulClient: client}, nil
 }
 
+// Target return a description for the given target that is suitable for being a key for cache.
 func (c *consulResolver) Target(ctx context.Context, target rpcinfo.EndpointInfo) (description string) {
 	return target.ServiceName()
 }
 
+// Resolve a service info by desc.
 func (c *consulResolver) Resolve(ctx context.Context, desc string) (discovery.Result, error) {
 	var eps []discovery.Instance
 
@@ -59,7 +62,12 @@ func (c *consulResolver) Resolve(ctx context.Context, desc string) (discovery.Re
 	for _, service := range services {
 		log.Println(service.Address)
 		weight := service.Weights.Passing
-		eps = append(eps, discovery.NewInstance(service.Meta["network"], fmt.Sprintf("%s:%d", service.Address, service.Port), weight, service.Meta))
+		eps = append(eps, discovery.NewInstance(
+			service.Meta["network"],
+			fmt.Sprintf("%s:%d", service.Address, service.Port),
+			weight,
+			service.Meta),
+		)
 	}
 
 	return discovery.Result{
@@ -69,10 +77,12 @@ func (c *consulResolver) Resolve(ctx context.Context, desc string) (discovery.Re
 	}, nil
 }
 
+// Diff computes the difference between two results.
 func (c *consulResolver) Diff(cacheKey string, prev, next discovery.Result) (discovery.Change, bool) {
 	return discovery.DefaultDiff(cacheKey, prev, next)
 }
 
+// Name return the name of this resolver.
 func (c *consulResolver) Name() string {
 	return "consul"
 }

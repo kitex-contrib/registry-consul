@@ -17,18 +17,49 @@ package consul
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
+	"strconv"
 	"testing"
+	"time"
 
+	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/registry"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	consulapi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/assert"
 )
 
 const (
-	consulAddr  = "127.0.0.1:8500"
-	testSvcName = "test-svc"
+	consulAddr = "127.0.0.1:8500"
 )
+
+var (
+	consulClient *consulapi.Client
+	cRegistry    registry.Registry
+	cResolver    discovery.Resolver
+)
+
+func init() {
+	config := consulapi.DefaultConfig()
+	config.Address = consulAddr
+	c, err := consulapi.NewClient(config)
+	if err != nil {
+		return
+	}
+	consulClient = c
+
+	r, err := NewConsulRegister(consulAddr)
+	if err != nil {
+		return
+	}
+	cRegistry = r
+
+	resolver, err := NewConsulResolver(consulAddr)
+	if err != nil {
+		return
+	}
+	cResolver = resolver
+}
 
 // TestNewConsulRegister tests the NewConsulRegister function.
 func TestNewConsulRegister(t *testing.T) {
@@ -38,71 +69,184 @@ func TestNewConsulRegister(t *testing.T) {
 
 // NewConsulRegisterWithConfig tests the NewConsulRegisterWithConfig function.
 func TestNewConsulRegisterWithConfig(t *testing.T) {
-	_, err := NewConsulRegisterWithConfig(&api.config{})
+	_, err := NewConsulRegisterWithConfig(&consulapi.Config{
+		Address:   consulAddr,
+		WaitTime:  5 * time.Second,
+		Namespace: "TEST-NS",
+	})
 	assert.NoError(t, err)
+}
+
+// TestNewConsulResolver tests the NewConsulResolver function.
+func TestNewConsulResolver(t *testing.T) {
+	_, err := NewConsulResolver(consulAddr)
+	assert.NoError(t, err)
+}
+
+// TestNewConsulResolver tests unit test preparatory work.
+func TestConsulPrepared(t *testing.T) {
+	assert.NotNil(t, consulClient)
+	assert.NotNil(t, cRegistry)
+	assert.NotNil(t, cResolver)
 }
 
 // TestRegister tests the Register function.
 func TestRegister(t *testing.T) {
-	c, err := NewConsulRegister(consulAddr)
-	assert.NoError(t, err)
-	addr, _ := net.ResolveTCPAddr("tcp", ":9999")
-	info := &registry.Info{ServiceName: "product", Weight: 100, PayloadCodec: "thrift", Tags: tags, Addr: addr}
-	err = c.Register(info)
+	svcList, err := consulClient.Agent().Services()
 	assert.Nil(t, err)
+	svcNum := len(svcList)
+
+	var (
+		testSvcName   = strconv.Itoa(int(time.Now().Unix())) + ".svc.local"
+		testSvcAddr   = "127.0.0.1:8080"
+		testSvcWeight = 777
+		tagList       = map[string]string{
+			"k1": "vv1",
+			"k2": "vv2",
+			"kv": "vv3",
+		}
+	)
+	addr, _ := net.ResolveTCPAddr("tcp", testSvcAddr)
+	info := &registry.Info{
+		ServiceName: testSvcName,
+		Weight:      testSvcWeight,
+		Addr:        addr,
+		Tags:        tagList,
+	}
+	err = cRegistry.Register(info)
+	assert.Nil(t, err)
+	time.Sleep(time.Second)
+
+	svcList, err = consulClient.Agent().Services()
+	assert.Nil(t, err)
+	assert.Equal(t, svcNum+1, len(svcList))
+
+	list, _, err := consulClient.Catalog().Service(testSvcName, "", nil)
+	assert.Nil(t, err)
+	if assert.Equal(t, 1, len(list)) {
+		ss := list[0]
+		assert.Equal(t, testSvcName, ss.ServiceName)
+		assert.Equal(t, testSvcAddr, fmt.Sprintf("%s:%d", ss.ServiceAddress, ss.ServicePort))
+		assert.Equal(t, testSvcWeight, ss.ServiceWeights.Passing)
+		assert.Equal(t, tagList, ss.ServiceMeta)
+	}
 }
 
 // TestConsulDiscovery tests the ConsulDiscovery function.
 func TestConsulDiscovery(t *testing.T) {
-	c, err := NewConsulRegister(consulAddr)
-	assert.NoError(t, err)
-	tags := map[string]string{"group": "blue", "idc": "hd1"}
-	addr, _ := net.ResolveTCPAddr("tcp", ":9999")
-	info := &registry.Info{ServiceName: "product", Weight: 100, PayloadCodec: "thrift", Tags: tags, Addr: addr}
-	err = c.Register(info)
+	var (
+		testSvcName   = strconv.Itoa(int(time.Now().Unix())) + ".svc.local"
+		testSvcAddr   = "127.0.0.1:8181"
+		testSvcWeight = 777
+		ctx           = context.Background()
+	)
+	addr, _ := net.ResolveTCPAddr("tcp", testSvcAddr)
+	info := &registry.Info{
+		ServiceName: testSvcName,
+		Weight:      testSvcWeight,
+		Addr:        addr,
+	}
+	err := cRegistry.Register(info)
 	assert.Nil(t, err)
+	time.Sleep(time.Second)
 
 	// resolve
-	res, err := NewConsulResolver("127.0.0.1:8500")
+	result, err := cResolver.Resolve(ctx, testSvcName)
 	assert.Nil(t, err)
-	target := res.Target(context.Background(), rpcinfo.NewEndpointInfo("product", "", nil, nil))
-	result, err := res.Resolve(context.Background(), target)
-	assert.Nil(t, err)
+	assert.Equal(t, 1, len(result.Instances))
 
-	// compare data
-	if len(result.Instances) == 0 {
-		t.Errorf("instance num mismatch, expect: %d, in fact: %d", 1, 0)
-	} else if len(result.Instances) == 1 {
-		instance := result.Instances[0]
-		host, port, err := net.SplitHostPort(instance.Address().String())
-		assert.Nil(t, err)
-		local, _ := getLocalIPv4Address()
-		if host != local {
-			t.Errorf("instance host is mismatch, expect: %s, in fact: %s", local, host)
-		}
-		if port != "9999" {
-			t.Errorf("instance port is mismatch, expect: %s, in fact: %s", "9999", port)
-		}
-		if info.Weight != instance.Weight() {
-			t.Errorf("instance weight is mismatch, expect: %d, in fact: %d", info.Weight, instance.Weight())
-		}
-		for k, v := range info.Tags {
-			if v1, exist := instance.Tag(k); !exist || v != v1 {
-				t.Errorf("instance tags is mismatch, expect k:v %s:%s, in fact k:v %s:%s", k, v, k, v1)
-			}
-		}
+	instance := result.Instances[0]
+	assert.Equal(t, testSvcWeight, instance.Weight())
+	assert.Equal(t, testSvcAddr, instance.Address().String())
+}
+
+func TestDeregister(t *testing.T) {
+	var (
+		testSvcName   = strconv.Itoa(int(time.Now().Unix())) + ".svc.local"
+		testSvcAddr   = "127.0.0.1:8181"
+		testSvcWeight = 777
+		ctx           = context.Background()
+	)
+	addr, _ := net.ResolveTCPAddr("tcp", testSvcAddr)
+	info := &registry.Info{
+		ServiceName: testSvcName,
+		Weight:      testSvcWeight,
+		Addr:        addr,
 	}
+	err := cRegistry.Register(info)
+	assert.Nil(t, err)
+	time.Sleep(time.Second)
+
+	// resolve
+	result, err := cResolver.Resolve(ctx, testSvcName)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(result.Instances))
 
 	// deregister
-	err = c.Deregister(info)
+	err = cRegistry.Deregister(info)
 	assert.Nil(t, err)
+	time.Sleep(time.Second)
 
 	// resolve again
-	result, err = res.Resolve(context.Background(), target)
-	assert.Error(t, errors.New("no service found"), err)
+	result, err = cResolver.Resolve(ctx, testSvcName)
+	assert.NotNil(t, err)
+	assert.Equal(t, errors.New("no service found"), err)
 }
 
 // TestMultiServicesRegister tests the Register function, register multiple services, then deregister one of them.
 func TestMultiServicesRegister(t *testing.T) {
+	var (
+		testSvcName = "svc.local"
 
+		testIP1   = net.IPv4(127, 0, 0, 1)
+		testPort1 = 8811
+
+		testIP2   = net.IPv4(127, 0, 0, 2)
+		testPort2 = 8822
+
+		testIP3   = net.IPv4(127, 0, 0, 3)
+		testPort3 = 8833
+	)
+
+	err := cRegistry.Register(&registry.Info{
+		ServiceName: testSvcName,
+		Weight:      11,
+		Addr:        &net.TCPAddr{IP: testIP1, Port: testPort1},
+	})
+	assert.Nil(t, err)
+
+	err = cRegistry.Register(&registry.Info{
+		ServiceName: testSvcName,
+		Weight:      22,
+		Addr:        &net.TCPAddr{IP: testIP2, Port: testPort2},
+	})
+	assert.Nil(t, err)
+
+	err = cRegistry.Register(&registry.Info{
+		ServiceName: testSvcName,
+		Weight:      33,
+		Addr:        &net.TCPAddr{IP: testIP3, Port: testPort3},
+	})
+	assert.Nil(t, err)
+
+	time.Sleep(time.Second)
+
+	svcList, _, err := consulClient.Catalog().Service(testSvcName, "", nil)
+	assert.Nil(t, err)
+	assert.Equal(t, 3, len(svcList))
+
+	err = cRegistry.Deregister(&registry.Info{
+		ServiceName: testSvcName,
+		Weight:      22,
+		Addr:        &net.TCPAddr{IP: testIP2, Port: testPort2},
+	})
+	svcList, _, err = consulClient.Catalog().Service(testSvcName, "", nil)
+	assert.Nil(t, err)
+	if assert.Equal(t, 2, len(svcList)) {
+		for _, service := range svcList {
+			assert.Equal(t, testSvcName, service.ServiceName)
+			assert.Contains(t, []int{testPort1, testPort3}, service.ServicePort)
+			assert.Contains(t, []string{testIP1.String(), testIP3.String()}, service.ServiceAddress)
+		}
+	}
 }

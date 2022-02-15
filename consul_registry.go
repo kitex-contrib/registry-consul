@@ -29,8 +29,10 @@ type consulRegistry struct {
 	check        *api.AgentServiceCheck
 }
 
+var _ registry.Registry = (*consulRegistry)(nil)
+
 // NewConsulRegister create a new registry using consul.
-func NewConsulRegister(address string) (*consulRegistry, error) {
+func NewConsulRegister(address string) (registry.Registry, error) {
 	config := api.DefaultConfig()
 	config.Address = address
 	client, err := api.NewClient(config)
@@ -73,9 +75,6 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 	if svcInfo.Meta == nil {
 		svcInfo.Meta = make(map[string]string)
 	}
-	if _, ok := svcInfo.Meta["network"]; !ok {
-		svcInfo.Meta["network"] = info.Addr.Network()
-	}
 	host, port, err := net.SplitHostPort(info.Addr.String())
 	if err != nil {
 		return errors.New("parse registry info addr error")
@@ -101,7 +100,6 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 		c.check.TCP = fmt.Sprintf("%s:%d", host, p)
 		svcInfo.Check = c.check
 	}
-
 	return c.consulClient.Agent().ServiceRegister(svcInfo)
 }
 

@@ -25,9 +25,15 @@ import (
 	"github.com/hashicorp/consul/api"
 )
 
+const (
+	defaultNetwork = "tcp"
+)
+
 type consulResolver struct {
 	consulClient *api.Client
 }
+
+var _ discovery.Resolver = (*consulResolver)(nil)
 
 // NewConsulResolver create a service resolver using consul.
 func NewConsulResolver(address string) (discovery.Resolver, error) {
@@ -42,15 +48,14 @@ func NewConsulResolver(address string) (discovery.Resolver, error) {
 }
 
 // Target return a description for the given target that is suitable for being a key for cache.
-func (c *consulResolver) Target(ctx context.Context, target rpcinfo.EndpointInfo) (description string) {
+func (c *consulResolver) Target(_ context.Context, target rpcinfo.EndpointInfo) (description string) {
 	return target.ServiceName()
 }
 
 // Resolve a service info by desc.
-func (c *consulResolver) Resolve(ctx context.Context, desc string) (discovery.Result, error) {
+func (c *consulResolver) Resolve(_ context.Context, desc string) (discovery.Result, error) {
 	var eps []discovery.Instance
-
-	services, err := c.consulClient.Agent().Services()
+	services, _, err := c.consulClient.Catalog().Service(desc, "", nil)
 	if err != nil {
 		log.Printf("err:%v", err)
 		return discovery.Result{}, err
@@ -58,16 +63,13 @@ func (c *consulResolver) Resolve(ctx context.Context, desc string) (discovery.Re
 	if len(services) == 0 {
 		return discovery.Result{}, errors.New("no service found")
 	}
-
-	for _, service := range services {
-		log.Println(service.Address)
-		weight := service.Weights.Passing
+	for _, svc := range services {
 		eps = append(eps, discovery.NewInstance(
-			service.Meta["network"],
-			fmt.Sprintf("%s:%d", service.Address, service.Port),
-			weight,
-			service.Meta),
-		)
+			defaultNetwork,
+			fmt.Sprint(svc.ServiceAddress, ":", svc.ServicePort),
+			svc.ServiceWeights.Passing,
+			svc.ServiceMeta,
+		))
 	}
 
 	return discovery.Result{

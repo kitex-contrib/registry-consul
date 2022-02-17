@@ -19,11 +19,10 @@ import (
 	"log"
 	"time"
 
-	consul "github.com/kitex-contrib/registry-consul"
-
 	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api"
 	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api/hello"
 	"github.com/cloudwego/kitex/client"
+	consul "github.com/kitex-contrib/registry-consul"
 )
 
 func main() {
@@ -31,11 +30,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	client := hello.MustNewClient("echo", client.WithResolver(r))
+	c := hello.MustNewClient("echo", client.WithResolver(r), client.WithRPCTimeout(time.Second*3))
+	ctx := context.Background()
 	for {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-		resp, err := client.Echo(ctx, &api.Request{Message: "Hello"})
-		cancel()
+		resp, err := c.Echo(ctx, &api.Request{Message: "Hello"})
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -18,13 +18,12 @@ import (
 	"context"
 	"log"
 
-	consul "github.com/kitex-contrib/registry-consul"
-
 	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api"
 	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api/hello"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/server"
 	consulapi "github.com/hashicorp/consul/api"
+	consul "github.com/kitex-contrib/registry-consul"
 )
 
 type HelloImpl struct{}
@@ -48,19 +47,15 @@ func main() {
 		DeregisterCriticalServiceAfter: "10s",
 	})
 
-	r.CustomizeRegistration(&consulapi.AgentServiceRegistration{
-		Tags: []string{"dev"},
-	})
-
-	// r, err := consul.NewConsulRegisterWithConfig(consulapi.DefaultConfig())
-	// if err != nil {
-	//	log.Fatal(err)
-	// }
-
-	server := hello.NewServer(new(HelloImpl), server.WithRegistry(r), server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{
-		ServiceName: "echo",
-	}))
-	err = server.Run()
+	svc := hello.NewServer(
+		new(HelloImpl),
+		server.WithRegistry(r),
+		server.WithRegistryInfo(&registry.Info{
+			ServiceName: "hello",
+			Weight:      1, // weights must be greater than 0 in consul,else received error and exit.
+		}),
+	)
+	err = svc.Run()
 	if err != nil {
 		log.Fatal(err)
 	}

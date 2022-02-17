@@ -26,11 +26,13 @@ import (
 
 type consulRegistry struct {
 	consulClient *api.Client
-	registration *api.AgentServiceRegistration
 	check        *api.AgentServiceCheck
 }
 
-func NewConsulRegister(address string) (*consulRegistry, error) {
+var _ registry.Registry = (*consulRegistry)(nil)
+
+// NewConsulRegister create a new registry using consul.
+func NewConsulRegister(address string) (registry.Registry, error) {
 	config := api.DefaultConfig()
 	config.Address = address
 	client, err := api.NewClient(config)
@@ -41,15 +43,7 @@ func NewConsulRegister(address string) (*consulRegistry, error) {
 	return &consulRegistry{consulClient: client, check: defaultCheck()}, nil
 }
 
-func defaultCheck() *api.AgentServiceCheck {
-	check := new(api.AgentServiceCheck)
-	check.Timeout = "5s"
-	check.Interval = "5s"
-	check.DeregisterCriticalServiceAfter = "30s"
-
-	return check
-}
-
+// NewConsulRegisterWithConfig create a new registry using consul, with a custom config.
 func NewConsulRegisterWithConfig(config *api.Config) (*consulRegistry, error) {
 	client, err := api.NewClient(config)
 	if err != nil {
@@ -59,29 +53,28 @@ func NewConsulRegisterWithConfig(config *api.Config) (*consulRegistry, error) {
 	return &consulRegistry{consulClient: client}, nil
 }
 
-func (c *consulRegistry) CustomizeRegistration(registration *api.AgentServiceRegistration) {
-	c.registration = registration
-}
-
+// CustomizeCheck customize the check of the service.
 func (c *consulRegistry) CustomizeCheck(check *api.AgentServiceCheck) {
 	c.check = check
 }
 
+// Register register a service to consul.
 func (c *consulRegistry) Register(info *registry.Info) error {
 	if err := validateRegistryInfo(info); err != nil {
 		return err
 	}
-
-	if c.registration == nil {
-		c.registration = &api.AgentServiceRegistration{
-			Name: info.ServiceName,
-		}
-	} else {
-		c.registration.Name = info.ServiceName
+	svcInfo := &api.AgentServiceRegistration{
+		ID:   fmt.Sprintf("%s:%s", info.ServiceName, info.Addr.String()),
+		Name: info.ServiceName,
+		Meta: info.Tags,
+		Weights: &api.AgentWeights{
+			Passing: info.Weight,
+			Warning: info.Weight,
+		},
 	}
-
-	c.registration.ID = fmt.Sprintf("%s:%s", info.ServiceName, info.Addr.String())
-
+	if svcInfo.Meta == nil {
+		svcInfo.Meta = make(map[string]string)
+	}
 	host, port, err := net.SplitHostPort(info.Addr.String())
 	if err != nil {
 		return errors.New("parse registry info addr error")
@@ -94,34 +87,25 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 		if err != nil {
 			return fmt.Errorf("get local ipv4 error, cause %w", err)
 		}
-		c.registration.Address = ipv4
+		svcInfo.Address = ipv4
 	} else {
-		c.registration.Address = host
+		svcInfo.Address = host
 	}
 	p, err := strconv.Atoi(port)
 	if err != nil {
 		return err
 	}
-	c.registration.Port = p
-
+	svcInfo.Port = p
 	if c.check != nil {
 		c.check.TCP = fmt.Sprintf("%s:%d", host, p)
-		c.registration.Check = c.check
+		svcInfo.Check = c.check
 	}
+	return c.consulClient.Agent().ServiceRegister(svcInfo)
+}
 
-	c.registration.Meta = info.Tags
-
-	if c.registration.Meta == nil {
-		c.registration.Meta = make(map[string]string)
-	}
-
-	c.registration.Meta["network"] = info.Addr.Network()
-	c.registration.Weights = &api.AgentWeights{
-		Passing: info.Weight,
-		Warning: 1,
-	}
-
-	return c.consulClient.Agent().ServiceRegister(c.registration)
+// Deregister deregister a service from consul.
+func (c *consulRegistry) Deregister(info *registry.Info) error {
+	return c.consulClient.Agent().ServiceDeregister(fmt.Sprintf("%s:%s", info.ServiceName, info.Addr.String()))
 }
 
 func validateRegistryInfo(info *registry.Info) error {
@@ -134,6 +118,11 @@ func validateRegistryInfo(info *registry.Info) error {
 	return nil
 }
 
-func (c *consulRegistry) Deregister(info *registry.Info) error {
-	return c.consulClient.Agent().ServiceDeregister(fmt.Sprintf("%s:%s", info.ServiceName, info.Addr.String()))
+func defaultCheck() *api.AgentServiceCheck {
+	check := new(api.AgentServiceCheck)
+	check.Timeout = "5s"
+	check.Interval = "5s"
+	check.DeregisterCriticalServiceAfter = "30s"
+
+	return check
 }

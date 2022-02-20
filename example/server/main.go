@@ -22,13 +22,12 @@ import (
 	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api/hello"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/server"
-	consulapi "github.com/hashicorp/consul/api"
 	consul "github.com/kitex-contrib/registry-consul"
 )
 
 type HelloImpl struct{}
 
-func (h *HelloImpl) Echo(ctx context.Context, req *api.Request) (resp *api.Response, err error) {
+func (h *HelloImpl) Echo(_ context.Context, req *api.Request) (resp *api.Response, err error) {
 	resp = &api.Response{
 		Message: req.Message,
 	}
@@ -40,12 +39,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	r.CustomizeCheck(&consulapi.AgentServiceCheck{
-		Timeout:                        "1s",
-		Interval:                       "3s",
-		DeregisterCriticalServiceAfter: "10s",
-	})
 
 	svc := hello.NewServer(
 		new(HelloImpl),

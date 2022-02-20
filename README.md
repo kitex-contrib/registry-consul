@@ -45,12 +45,12 @@ you can also use `WithCheck` to modify your config
 
 ```
 import (
-	// ...
+	...
 	consul "github.com/kitex-contrib/registry-consul"
 	consulapi "github.com/hashicorp/consul/api"
 )
 func main() {
-    // ...
+    ...
 	r, err := consul.NewConsulRegister("127.0.0.1:8500", consul.WithCheck(&consulapi.AgentServiceCheck{
             Interval:                       "7s",
             Timeout:                        "5s",
@@ -66,17 +66,12 @@ import (
     ...
     "github.com/cloudwego/kitex/client"
     consul "github.com/kitex-contrib/registry-consul"
-    consulapi "github.com/hashicorp/consul/api"
     ...
 )
 
 func main() {
     ...
-    r, err := consul.NewConsulResolver("127.0.0.1:8500",consul.WithCheck(&consulapi.AgentServiceCheck{
-		Interval:                       "7s",
-		Timeout:                        "5s",
-		DeregisterCriticalServiceAfter: "70s",
-	}))
+    r, err := consul.NewConsulResolver("127.0.0.1:8500")
     if err != nil {
         log.Fatal(err)
     }

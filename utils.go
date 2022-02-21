@@ -16,6 +16,7 @@ package consul
 
 import (
 	"errors"
+	"fmt"
 	"net"
 )
 
@@ -35,4 +36,26 @@ func getLocalIPv4Address() (string, error) {
 		}
 	}
 	return "", errors.New("not found ipv4 address")
+}
+
+func parseAddr(addr net.Addr) (host string, port int, err error) {
+	host, portStr, err := net.SplitHostPort(addr.String())
+	if err != nil {
+		return "", 0, err
+	}
+	if host == "" || host == "::" {
+		host, err = getLocalIPv4Address()
+		if err != nil {
+			return "", 0, fmt.Errorf("get local ipv4 error, cause %w", err)
+		}
+	}
+	port, err = net.LookupPort(defaultNetwork, portStr)
+	if err != nil {
+		return "", 0, err
+	}
+	if port == 0 {
+		return "", 0, fmt.Errorf("invalid port %s", portStr)
+	}
+
+	return host, port, nil
 }

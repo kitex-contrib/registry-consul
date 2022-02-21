@@ -32,32 +32,30 @@ func main() {
 ```
 
 #### Customize Service Check
+
 registry has a default config for service check like
+
 ```
 check.Timeout = "5s"
 check.Interval = "5s"
-check.DeregisterCriticalServiceAfter = "30s"
+check.DeregisterCriticalServiceAfter = "1m"
 ```
 
-you can also use `CustomizeCheck` to modify your config
-```
-func main() {
-    ...
-    r.CustomizeCheck(&consulapi.AgentServiceCheck{
-        Timeout:                        "1s",
-        Interval:                       "3s",
-        DeregisterCriticalServiceAfter: "10s",
-    })
-}
-```
+you can also use `WithCheck` to modify your config
 
-#### Customize Registration
 ```
+import (
+	...
+	consul "github.com/kitex-contrib/registry-consul"
+	consulapi "github.com/hashicorp/consul/api"
+)
 func main() {
     ...
-    r.CustomizeRegistration(&consulapi.AgentServiceRegistration{
-        Tags: []string{"dev"},
-    })
+	r, err := consul.NewConsulRegister("127.0.0.1:8500", consul.WithCheck(&consulapi.AgentServiceCheck{
+            Interval:                       "7s",
+            Timeout:                        "5s",
+            DeregisterCriticalServiceAfter: "1m",
+	}))
 }
 ```
 

@@ -30,7 +30,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	c := hello.MustNewClient("echo", client.WithResolver(r), client.WithRPCTimeout(time.Second*3))
+	c := hello.MustNewClient("hello", client.WithResolver(r), client.WithRPCTimeout(time.Second*3))
 	ctx := context.Background()
 	for {
 		resp, err := c.Echo(ctx, &api.Request{Message: "Hello"})

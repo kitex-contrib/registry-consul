@@ -55,20 +55,24 @@ func (c *consulResolver) Target(_ context.Context, target rpcinfo.EndpointInfo) 
 // Resolve a service info by desc.
 func (c *consulResolver) Resolve(_ context.Context, desc string) (discovery.Result, error) {
 	var eps []discovery.Instance
-	services, _, err := c.consulClient.Catalog().Service(desc, "", nil)
+	agentServiceList, _, err := c.consulClient.Health().Service(desc, "", true, nil)
 	if err != nil {
 		log.Printf("err:%v", err)
 		return discovery.Result{}, err
 	}
-	if len(services) == 0 {
+	if len(agentServiceList) == 0 {
 		return discovery.Result{}, errors.New("no service found")
 	}
-	for _, svc := range services {
+	for _, i := range agentServiceList {
+		svc := i.Service
+		if svc == nil || svc.Address == "" {
+			continue
+		}
 		eps = append(eps, discovery.NewInstance(
 			defaultNetwork,
-			fmt.Sprint(svc.ServiceAddress, ":", svc.ServicePort),
-			svc.ServiceWeights.Passing,
-			svc.ServiceMeta,
+			fmt.Sprint(svc.Address, ":", svc.Port),
+			svc.Weights.Passing,
+			svc.Meta,
 		))
 	}
 

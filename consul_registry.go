@@ -17,8 +17,6 @@ package consul
 import (
 	"errors"
 	"fmt"
-	"net"
-	"strconv"
 
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/hashicorp/consul/api"
@@ -26,13 +24,25 @@ import (
 
 type consulRegistry struct {
 	consulClient *api.Client
-	check        *api.AgentServiceCheck
+	opts         options
 }
 
 var _ registry.Registry = (*consulRegistry)(nil)
 
+type options struct {
+	check *api.AgentServiceCheck
+}
+
+// Option is consul option.
+type Option func(o *options)
+
+// WithCheck is consul registry option to set AgentServiceCheck.
+func WithCheck(check *api.AgentServiceCheck) Option {
+	return func(o *options) { o.check = check }
+}
+
 // NewConsulRegister create a new registry using consul.
-func NewConsulRegister(address string) (registry.Registry, error) {
+func NewConsulRegister(address string, opts ...Option) (registry.Registry, error) {
 	config := api.DefaultConfig()
 	config.Address = address
 	client, err := api.NewClient(config)
@@ -40,7 +50,15 @@ func NewConsulRegister(address string) (registry.Registry, error) {
 		return nil, err
 	}
 
-	return &consulRegistry{consulClient: client, check: defaultCheck()}, nil
+	op := options{
+		check: defaultCheck(),
+	}
+
+	for _, option := range opts {
+		option(&op)
+	}
+
+	return &consulRegistry{consulClient: client, opts: op}, nil
 }
 
 // NewConsulRegisterWithConfig create a new registry using consul, with a custom config.
@@ -53,59 +71,46 @@ func NewConsulRegisterWithConfig(config *api.Config) (*consulRegistry, error) {
 	return &consulRegistry{consulClient: client}, nil
 }
 
-// CustomizeCheck customize the check of the service.
-func (c *consulRegistry) CustomizeCheck(check *api.AgentServiceCheck) {
-	c.check = check
-}
-
 // Register register a service to consul.
 func (c *consulRegistry) Register(info *registry.Info) error {
 	if err := validateRegistryInfo(info); err != nil {
 		return err
 	}
+
+	host, port, err := parseAddr(info.Addr)
+	if err != nil {
+		return err
+	}
+	tcpAddr := fmt.Sprintf("%s:%d", host, port)
 	svcInfo := &api.AgentServiceRegistration{
-		ID:   fmt.Sprintf("%s:%s", info.ServiceName, info.Addr.String()),
-		Name: info.ServiceName,
-		Meta: info.Tags,
+		ID:      fmt.Sprintf("%s:%s", info.ServiceName, tcpAddr),
+		Address: host,
+		Port:    port,
+		Name:    info.ServiceName,
+		Meta:    info.Tags,
 		Weights: &api.AgentWeights{
 			Passing: info.Weight,
 			Warning: info.Weight,
 		},
+		Check: c.opts.check,
 	}
-	if svcInfo.Meta == nil {
-		svcInfo.Meta = make(map[string]string)
+
+	if c.opts.check != nil {
+		c.opts.check.TCP = tcpAddr
+		svcInfo.Check = c.opts.check
 	}
-	host, port, err := net.SplitHostPort(info.Addr.String())
-	if err != nil {
-		return errors.New("parse registry info addr error")
-	}
-	if port == "" {
-		return errors.New("registry info addr missing port")
-	}
-	if host == "" || host == "::" {
-		ipv4, err := getLocalIPv4Address()
-		if err != nil {
-			return fmt.Errorf("get local ipv4 error, cause %w", err)
-		}
-		svcInfo.Address = ipv4
-	} else {
-		svcInfo.Address = host
-	}
-	p, err := strconv.Atoi(port)
-	if err != nil {
-		return err
-	}
-	svcInfo.Port = p
-	if c.check != nil {
-		c.check.TCP = fmt.Sprintf("%s:%d", host, p)
-		svcInfo.Check = c.check
-	}
+
 	return c.consulClient.Agent().ServiceRegister(svcInfo)
 }
 
 // Deregister deregister a service from consul.
 func (c *consulRegistry) Deregister(info *registry.Info) error {
-	return c.consulClient.Agent().ServiceDeregister(fmt.Sprintf("%s:%s", info.ServiceName, info.Addr.String()))
+	host, port, err := parseAddr(info.Addr)
+	if err != nil {
+		return err
+	}
+	svcID := fmt.Sprintf("%s:%s:%d", info.ServiceName, host, port)
+	return c.consulClient.Agent().ServiceDeregister(svcID)
 }
 
 func validateRegistryInfo(info *registry.Info) error {
@@ -122,7 +127,7 @@ func defaultCheck() *api.AgentServiceCheck {
 	check := new(api.AgentServiceCheck)
 	check.Timeout = "5s"
 	check.Interval = "5s"
-	check.DeregisterCriticalServiceAfter = "30s"
+	check.DeregisterCriticalServiceAfter = "1m"
 
 	return check
 }

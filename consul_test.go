@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"strconv"
 	"testing"
@@ -37,6 +38,7 @@ var (
 	consulClient *consulapi.Client
 	cRegistry    registry.Registry
 	cResolver    discovery.Resolver
+	localIpAddr  string
 )
 
 func init() {
@@ -44,6 +46,7 @@ func init() {
 	config.Address = consulAddr
 	c, err := consulapi.NewClient(config)
 	if err != nil {
+		log.Fatal(err)
 		return
 	}
 	consulClient = c
@@ -59,6 +62,8 @@ func init() {
 		return
 	}
 	cResolver = resolver
+
+	localIpAddr, _ = getLocalIPv4Address()
 }
 
 // TestNewConsulRegister tests the NewConsulRegister function.
@@ -92,43 +97,47 @@ func TestConsulPrepared(t *testing.T) {
 
 // TestRegister tests the Register function.
 func TestRegister(t *testing.T) {
-	svcList, err := consulClient.Agent().Services()
-	assert.Nil(t, err)
-	svcNum := len(svcList)
-
 	var (
 		testSvcName   = strconv.Itoa(int(time.Now().Unix())) + ".svc.local"
-		testSvcAddr   = "127.0.0.1:8080"
+		testSvcPort   = 8081
 		testSvcWeight = 777
-		tagList       = map[string]string{
+		metaList      = map[string]string{
 			"k1": "vv1",
 			"k2": "vv2",
-			"kv": "vv3",
+			"k3": "vv3",
 		}
 	)
-	addr, _ := net.ResolveTCPAddr("tcp", testSvcAddr)
+
+	// listen on the port, and wait for the health check to connect
+	addr := fmt.Sprintf("%s:%d", localIpAddr, testSvcPort)
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Errorf("listen tcp %s failed!", addr)
+		t.Fail()
+	}
+	defer lis.Close()
+
+	testSvcAddr, _ := net.ResolveTCPAddr("tcp", addr)
 	info := &registry.Info{
 		ServiceName: testSvcName,
 		Weight:      testSvcWeight,
-		Addr:        addr,
-		Tags:        tagList,
+		Addr:        testSvcAddr,
+		Tags:        metaList,
 	}
 	err = cRegistry.Register(info)
 	assert.Nil(t, err)
-	time.Sleep(time.Second)
+	// wait for health check passing
+	time.Sleep(time.Second * 6)
 
-	svcList, err = consulClient.Agent().Services()
-	assert.Nil(t, err)
-	assert.Equal(t, svcNum+1, len(svcList))
-
-	list, _, err := consulClient.Catalog().Service(testSvcName, "", nil)
+	list, _, err := consulClient.Health().Service(testSvcName, "", true, nil)
 	assert.Nil(t, err)
 	if assert.Equal(t, 1, len(list)) {
 		ss := list[0]
-		assert.Equal(t, testSvcName, ss.ServiceName)
-		assert.Equal(t, testSvcAddr, fmt.Sprintf("%s:%d", ss.ServiceAddress, ss.ServicePort))
-		assert.Equal(t, testSvcWeight, ss.ServiceWeights.Passing)
-		assert.Equal(t, tagList, ss.ServiceMeta)
+		gotSvc := ss.Service
+		assert.Equal(t, testSvcName, gotSvc.Service)
+		assert.Equal(t, testSvcAddr.String(), fmt.Sprintf("%s:%d", gotSvc.Address, gotSvc.Port))
+		assert.Equal(t, testSvcWeight, gotSvc.Weights.Passing)
+		assert.Equal(t, metaList, gotSvc.Meta)
 	}
 }
 
@@ -136,46 +145,66 @@ func TestRegister(t *testing.T) {
 func TestConsulDiscovery(t *testing.T) {
 	var (
 		testSvcName   = strconv.Itoa(int(time.Now().Unix())) + ".svc.local"
-		testSvcAddr   = "127.0.0.1:8181"
+		testSvcPort   = 8082
 		testSvcWeight = 777
 		ctx           = context.Background()
 	)
-	addr, _ := net.ResolveTCPAddr("tcp", testSvcAddr)
+	// listen on the port, and wait for the health check to connect
+	addr := fmt.Sprintf("%s:%d", localIpAddr, testSvcPort)
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Errorf("listen tcp %s failed!", addr)
+		t.Fail()
+	}
+	defer lis.Close()
+
+	testSvcAddr, _ := net.ResolveTCPAddr("tcp", addr)
 	info := &registry.Info{
 		ServiceName: testSvcName,
 		Weight:      testSvcWeight,
-		Addr:        addr,
+		Addr:        testSvcAddr,
 	}
-	err := cRegistry.Register(info)
+	err = cRegistry.Register(info)
 	assert.Nil(t, err)
-	time.Sleep(time.Second)
+	// wait for health check passing
+	time.Sleep(time.Second * 6)
 
 	// resolve
 	result, err := cResolver.Resolve(ctx, testSvcName)
 	assert.Nil(t, err)
-	assert.Equal(t, 1, len(result.Instances))
-
-	instance := result.Instances[0]
-	assert.Equal(t, testSvcWeight, instance.Weight())
-	assert.Equal(t, testSvcAddr, instance.Address().String())
+	if assert.Equal(t, 1, len(result.Instances)) {
+		instance := result.Instances[0]
+		assert.Equal(t, testSvcWeight, instance.Weight())
+		assert.Equal(t, testSvcAddr.String(), instance.Address().String())
+	}
 }
 
+// TestDeregister tests the Deregister function.
 func TestDeregister(t *testing.T) {
 	var (
 		testSvcName   = strconv.Itoa(int(time.Now().Unix())) + ".svc.local"
-		testSvcAddr   = "127.0.0.1:8181"
+		testSvcPort   = 8083
 		testSvcWeight = 777
 		ctx           = context.Background()
 	)
-	addr, _ := net.ResolveTCPAddr("tcp", testSvcAddr)
+	// listen on the port, and wait for the health check to connect
+	addr := fmt.Sprintf("%s:%d", localIpAddr, testSvcPort)
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Errorf("listen tcp %s failed!", addr)
+		t.Fail()
+	}
+	defer lis.Close()
+
+	testSvcAddr, _ := net.ResolveTCPAddr("tcp", addr)
 	info := &registry.Info{
 		ServiceName: testSvcName,
 		Weight:      testSvcWeight,
-		Addr:        addr,
+		Addr:        testSvcAddr,
 	}
-	err := cRegistry.Register(info)
+	err = cRegistry.Register(info)
 	assert.Nil(t, err)
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 6)
 
 	// resolve
 	result, err := cResolver.Resolve(ctx, testSvcName)
@@ -198,55 +227,80 @@ func TestMultiServicesRegister(t *testing.T) {
 	var (
 		testSvcName = "svc.local"
 
-		testIP1   = net.IPv4(127, 0, 0, 1)
-		testPort1 = 8811
-
-		testIP2   = net.IPv4(127, 0, 0, 2)
-		testPort2 = 8822
-
-		testIP3   = net.IPv4(127, 0, 0, 3)
-		testPort3 = 8833
+		testPort1 = 8091
+		testPort2 = 8092
+		testPort3 = 8093
 	)
 
-	err := cRegistry.Register(&registry.Info{
+	addr1 := fmt.Sprintf("%s:%d", localIpAddr, testPort1)
+	lis, err := net.Listen("tcp", addr1)
+	if err != nil {
+		t.Errorf("listen tcp %s failed!", addr1)
+		t.Fail()
+	}
+	defer lis.Close()
+
+	testSvcAddr1, _ := net.ResolveTCPAddr("tcp", addr1)
+	err = cRegistry.Register(&registry.Info{
 		ServiceName: testSvcName,
 		Weight:      11,
-		Addr:        &net.TCPAddr{IP: testIP1, Port: testPort1},
+		Addr:        testSvcAddr1,
 	})
 	assert.Nil(t, err)
 
+	addr2 := fmt.Sprintf("%s:%d", localIpAddr, testPort2)
+	lis2, err := net.Listen("tcp", addr2)
+	if err != nil {
+		t.Errorf("listen tcp %s failed!", addr2)
+		t.Fail()
+	}
+	defer lis2.Close()
+
+	testSvcAddr2, _ := net.ResolveTCPAddr("tcp", addr2)
 	err = cRegistry.Register(&registry.Info{
 		ServiceName: testSvcName,
 		Weight:      22,
-		Addr:        &net.TCPAddr{IP: testIP2, Port: testPort2},
+		Addr:        testSvcAddr2,
 	})
 	assert.Nil(t, err)
 
+	addr3 := fmt.Sprintf("%s:%d", localIpAddr, testPort3)
+	lis3, err := net.Listen("tcp", addr3)
+	if err != nil {
+		t.Errorf("listen tcp %s failed!", addr3)
+		t.Fail()
+		return
+	}
+	defer lis3.Close()
+
+	testSvcAddr3, _ := net.ResolveTCPAddr("tcp", addr3)
 	err = cRegistry.Register(&registry.Info{
 		ServiceName: testSvcName,
 		Weight:      33,
-		Addr:        &net.TCPAddr{IP: testIP3, Port: testPort3},
+		Addr:        testSvcAddr3,
 	})
 	assert.Nil(t, err)
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 6)
 
-	svcList, _, err := consulClient.Catalog().Service(testSvcName, "", nil)
+	svcList, _, err := consulClient.Health().Service(testSvcName, "", true, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, 3, len(svcList))
 
 	err = cRegistry.Deregister(&registry.Info{
 		ServiceName: testSvcName,
 		Weight:      22,
-		Addr:        &net.TCPAddr{IP: testIP2, Port: testPort2},
+		Addr:        testSvcAddr2,
 	})
-	svcList, _, err = consulClient.Catalog().Service(testSvcName, "", nil)
+	assert.Nil(t, err)
+	svcList, _, err = consulClient.Health().Service(testSvcName, "", true, nil)
 	assert.Nil(t, err)
 	if assert.Equal(t, 2, len(svcList)) {
-		for _, service := range svcList {
-			assert.Equal(t, testSvcName, service.ServiceName)
-			assert.Contains(t, []int{testPort1, testPort3}, service.ServicePort)
-			assert.Contains(t, []string{testIP1.String(), testIP3.String()}, service.ServiceAddress)
+		for _, entry := range svcList {
+			gotSvc := entry.Service
+			assert.Equal(t, testSvcName, gotSvc.Service)
+			assert.Contains(t, []int{testPort1, testPort3}, gotSvc.Port)
+			assert.Equal(t, localIpAddr, gotSvc.Address)
 		}
 	}
 }

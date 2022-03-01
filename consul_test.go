@@ -222,8 +222,8 @@ func TestDeregister(t *testing.T) {
 	assert.Equal(t, errors.New("no service found"), err)
 }
 
-// TestMultiServicesRegister tests the Register function, register multiple services, then deregister one of them.
-func TestMultiServicesRegister(t *testing.T) {
+// TestMultiInstancesRegister tests the Register function, register multiple instances, then deregister one of them.
+func TestMultiInstancesRegister(t *testing.T) {
 	var (
 		testSvcName = "svc.local"
 

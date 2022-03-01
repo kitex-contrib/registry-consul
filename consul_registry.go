@@ -81,9 +81,12 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 	if err != nil {
 		return err
 	}
-	tcpAddr := fmt.Sprintf("%s:%d", host, port)
+	svcID, err := getServiceId(info)
+	if err != nil {
+		return err
+	}
 	svcInfo := &api.AgentServiceRegistration{
-		ID:      fmt.Sprintf("%s:%s", info.ServiceName, tcpAddr),
+		ID:      svcID,
 		Address: host,
 		Port:    port,
 		Name:    info.ServiceName,
@@ -96,7 +99,7 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 	}
 
 	if c.opts.check != nil {
-		c.opts.check.TCP = tcpAddr
+		c.opts.check.TCP = fmt.Sprintf("%s:%d", host, port)
 		svcInfo.Check = c.opts.check
 	}
 
@@ -105,11 +108,10 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 
 // Deregister deregister a service from consul.
 func (c *consulRegistry) Deregister(info *registry.Info) error {
-	host, port, err := parseAddr(info.Addr)
+	svcID, err := getServiceId(info)
 	if err != nil {
 		return err
 	}
-	svcID := fmt.Sprintf("%s:%s:%d", info.ServiceName, host, port)
 	return c.consulClient.Agent().ServiceDeregister(svcID)
 }
 

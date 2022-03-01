@@ -18,6 +18,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+
+	"github.com/cloudwego/kitex/pkg/registry"
 )
 
 func getLocalIPv4Address() (string, error) {
@@ -58,4 +60,12 @@ func parseAddr(addr net.Addr) (host string, port int, err error) {
 	}
 
 	return host, port, nil
+}
+
+func getServiceId(info *registry.Info) (string, error) {
+	host, port, err := parseAddr(info.Addr)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s:%s:%d", info.ServiceName, host, port), nil
 }

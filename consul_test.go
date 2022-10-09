@@ -88,6 +88,15 @@ func TestNewConsulResolver(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// NewConsulResolverWithConfig tests the NewConsulResolverWithConfig function.
+func TestNewConsulResolverWithConfig(t *testing.T) {
+	_, err := NewConsulResolverWithConfig(&consulapi.Config{
+		Address: consulAddr,
+		Token:   "TEST-MY-TOKEN",
+	})
+	assert.NoError(t, err)
+}
+
 // TestNewConsulResolver tests unit test preparatory work.
 func TestConsulPrepared(t *testing.T) {
 	assert.NotNil(t, consulClient)

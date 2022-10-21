@@ -41,7 +41,7 @@ check.Interval = "5s"
 check.DeregisterCriticalServiceAfter = "1m"
 ```
 
-you can also use `WithCheck` to modify your config
+you can also use `WithCheck` to modify your service check setting
 
 ```
 import (
@@ -59,7 +59,37 @@ func main() {
 }
 ```
 
+#### Customize Register Config
+
+registry has a default config like
+
+```
+config.Address = "127.0.0.1:8500"
+config.Scheme = "http"
+```
+
+you can also use `NewConsulRegisterWithConfig` to modify your config
+
+```
+import (
+	...
+	consul "github.com/kitex-contrib/registry-consul"
+	consulapi "github.com/hashicorp/consul/api"
+)
+func main() {
+    ...
+	consulConfig := consulapi.Config{
+		Address: "127.0.0.1:8500",
+		Scheme:  "https"
+		Token:   "TEST-MY-TOKEN",
+	}
+	r, err := consul.NewConsulRegisterWithConfig(&consulConfig)
+}
+```
+
 ### Client
+
+#### Basic Usage
 
 ```
 import (
@@ -83,9 +113,37 @@ func main() {
 }
 ```
 
+#### Customize Resolver Config
+
+resolver has a default config like
+
+```
+config.Address = "127.0.0.1:8500"
+config.Scheme = "http"
+```
+
+you can also use `NewConsulResolverWithConfig` to modify your config
+
+```
+import (
+	...
+	consul "github.com/kitex-contrib/registry-consul"
+	consulapi "github.com/hashicorp/consul/api"
+)
+func main() {
+    ...
+	consulConfig := consulapi.Config{
+		Address: "127.0.0.1:8500",
+		Scheme:  "https"
+		Token:   "TEST-MY-TOKEN",
+	}
+	r, err := consul.NewConsulResolverWithConfig(&consulConfig)
+}
+```
+
 ## Example
 
-See Server and Client in example.
+See Server and Client in example/basic or example/custom-config.
 
 ## Compatibility
 

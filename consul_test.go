@@ -31,7 +31,8 @@ import (
 )
 
 const (
-	consulAddr = "127.0.0.1:8500"
+	consulAddr  = "127.0.0.1:8500"
+	consulToken = "TEST-MY-TOKEN1"
 )
 
 var (
@@ -72,7 +73,7 @@ func TestNewConsulRegister(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// NewConsulRegisterWithConfig tests the NewConsulRegisterWithConfig function.
+// TestNewConsulRegisterWithConfig tests the NewConsulRegisterWithConfig function.
 func TestNewConsulRegisterWithConfig(t *testing.T) {
 	_, err := NewConsulRegisterWithConfig(&consulapi.Config{
 		Address:   consulAddr,
@@ -88,12 +89,21 @@ func TestNewConsulResolver(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// NewConsulResolverWithConfig tests the NewConsulResolverWithConfig function.
+// TestNewConsulResolverWithConfig tests the NewConsulResolverWithConfig function.
 func TestNewConsulResolverWithConfig(t *testing.T) {
-	_, err := NewConsulResolverWithConfig(&consulapi.Config{
+	consulResolverWithConfig, err := NewConsulResolverWithConfig(&consulapi.Config{
 		Address: consulAddr,
-		Token:   "TEST-MY-TOKEN",
+		Token:   consulToken,
 	})
+	if err != nil {
+		assert.Error(t, err)
+	}
+	if consulResolverWithConfig == nil {
+		assert.Nil(t, consulResolverWithConfig)
+	}
+	if consulResolverWithConfig.Name() == "" {
+		assert.Nil(t, consulResolverWithConfig)
+	}
 	assert.NoError(t, err)
 }
 

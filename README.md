@@ -149,4 +149,4 @@ See Server and Client in example/basic or example/custom-config.
 
 Compatible with consul.
 
-maintained by: [Hanson](https://github.com/hanson)
+maintained by: [Hanson](https://github.com/hanson) / [baiyutang](https://github.com/baiyutang)

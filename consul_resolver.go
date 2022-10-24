@@ -47,6 +47,16 @@ func NewConsulResolver(address string) (discovery.Resolver, error) {
 	return &consulResolver{consulClient: client}, nil
 }
 
+// NewConsulResolverWithConfig create a service resolver using consul, with a custom config.
+func NewConsulResolverWithConfig(config *api.Config) (discovery.Resolver, error) {
+	client, err := api.NewClient(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &consulResolver{consulClient: client}, nil
+}
+
 // Target return a description for the given target that is suitable for being a key for cache.
 func (c *consulResolver) Target(_ context.Context, target rpcinfo.EndpointInfo) (description string) {
 	return target.ServiceName()

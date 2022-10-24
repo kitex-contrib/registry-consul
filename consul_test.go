@@ -31,7 +31,8 @@ import (
 )
 
 const (
-	consulAddr = "127.0.0.1:8500"
+	consulAddr  = "127.0.0.1:8500"
+	consulToken = "TEST-MY-TOKEN1"
 )
 
 var (
@@ -72,7 +73,7 @@ func TestNewConsulRegister(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// NewConsulRegisterWithConfig tests the NewConsulRegisterWithConfig function.
+// TestNewConsulRegisterWithConfig tests the NewConsulRegisterWithConfig function.
 func TestNewConsulRegisterWithConfig(t *testing.T) {
 	_, err := NewConsulRegisterWithConfig(&consulapi.Config{
 		Address:   consulAddr,
@@ -86,6 +87,16 @@ func TestNewConsulRegisterWithConfig(t *testing.T) {
 func TestNewConsulResolver(t *testing.T) {
 	_, err := NewConsulResolver(consulAddr)
 	assert.NoError(t, err)
+}
+
+// TestNewConsulResolverWithConfig tests the NewConsulResolverWithConfig function.
+func TestNewConsulResolverWithConfig(t *testing.T) {
+	consulResolverWithConfig, err := NewConsulResolverWithConfig(&consulapi.Config{
+		Address: consulAddr,
+		Token:   consulToken,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, consulResolverWithConfig)
 }
 
 // TestNewConsulResolver tests unit test preparatory work.

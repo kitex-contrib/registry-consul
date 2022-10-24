@@ -16,9 +16,10 @@ package main
 
 import (
 	"context"
-	consulapi "github.com/hashicorp/consul/api"
 	"log"
 	"time"
+
+	consulapi "github.com/hashicorp/consul/api"
 
 	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api"
 	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api/hello"

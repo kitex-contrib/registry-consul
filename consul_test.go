@@ -95,16 +95,8 @@ func TestNewConsulResolverWithConfig(t *testing.T) {
 		Address: consulAddr,
 		Token:   consulToken,
 	})
-	if err != nil {
-		assert.Error(t, err)
-	}
-	if consulResolverWithConfig == nil {
-		assert.Nil(t, consulResolverWithConfig)
-	}
-	if consulResolverWithConfig.Name() == "" {
-		assert.Nil(t, consulResolverWithConfig)
-	}
 	assert.NoError(t, err)
+	assert.NotNil(t, consulResolverWithConfig)
 }
 
 // TestNewConsulResolver tests unit test preparatory work.

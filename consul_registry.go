@@ -17,21 +17,26 @@ package consul
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/hashicorp/consul/api"
 )
+
+type options struct {
+	check *api.AgentServiceCheck
+}
 
 type consulRegistry struct {
 	consulClient *api.Client
 	opts         options
 }
 
+const kvJoinChar = ":"
+
 var _ registry.Registry = (*consulRegistry)(nil)
 
-type options struct {
-	check *api.AgentServiceCheck
-}
+var errillegalTagChar = errors.New("illegal tag character")
 
 // Option is consul option.
 type Option func(o *options)
@@ -72,6 +77,7 @@ func NewConsulRegisterWithConfig(config *api.Config) (*consulRegistry, error) {
 }
 
 // Register register a service to consul.
+// Note: the tag map of the service can not contain the `:` character.
 func (c *consulRegistry) Register(info *registry.Info) error {
 	if err := validateRegistryInfo(info); err != nil {
 		return err
@@ -81,16 +87,26 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 	if err != nil {
 		return err
 	}
+
 	svcID, err := getServiceId(info)
 	if err != nil {
 		return err
 	}
+
+	var svcTags []string
+	for k, v := range info.Tags {
+		if strings.Contains(k, kvJoinChar) || strings.Contains(v, kvJoinChar) {
+			return errillegalTagChar
+		}
+		svcTags = append(svcTags, fmt.Sprintf("%s%s%s", k, kvJoinChar, v))
+	}
+
 	svcInfo := &api.AgentServiceRegistration{
 		ID:      svcID,
 		Address: host,
 		Port:    port,
 		Name:    info.ServiceName,
-		Meta:    info.Tags,
+		Tags:    svcTags,
 		Weights: &api.AgentWeights{
 			Passing: info.Weight,
 			Warning: info.Weight,

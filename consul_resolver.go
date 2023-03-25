@@ -18,7 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"strings"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -67,22 +67,23 @@ func (c *consulResolver) Resolve(_ context.Context, desc string) (discovery.Resu
 	var eps []discovery.Instance
 	agentServiceList, _, err := c.consulClient.Health().Service(desc, "", true, nil)
 	if err != nil {
-		log.Printf("err:%v", err)
 		return discovery.Result{}, err
 	}
 	if len(agentServiceList) == 0 {
 		return discovery.Result{}, errors.New("no service found")
 	}
+
 	for _, i := range agentServiceList {
 		svc := i.Service
 		if svc == nil || svc.Address == "" {
 			continue
 		}
+
 		eps = append(eps, discovery.NewInstance(
 			defaultNetwork,
 			fmt.Sprint(svc.Address, ":", svc.Port),
 			svc.Weights.Passing,
-			svc.Meta,
+			splitTags(svc.Tags),
 		))
 	}
 
@@ -101,4 +102,28 @@ func (c *consulResolver) Diff(cacheKey string, prev, next discovery.Result) (dis
 // Name return the name of this resolver.
 func (c *consulResolver) Name() string {
 	return "consul"
+}
+
+func splitTags(tags []string) map[string]string {
+	n := len(tags)
+	tagMap := make(map[string]string, n)
+	if n == 0 {
+		return tagMap
+	}
+
+	for _, tag := range tags {
+		strArr := strings.Split(tag, kvJoinChar)
+		switch len(strArr) {
+		case 0:
+			continue
+		case 1:
+			key := strArr[0]
+			tagMap[key] = ""
+		default:
+			key := strArr[0]
+			tagMap[key] = strArr[1]
+		}
+	}
+
+	return tagMap
 }

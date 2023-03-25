@@ -112,11 +112,12 @@ func TestRegister(t *testing.T) {
 		testSvcName   = strconv.Itoa(int(time.Now().Unix())) + ".svc.local"
 		testSvcPort   = 8081
 		testSvcWeight = 777
-		metaList      = map[string]string{
+		tagMap        = map[string]string{
 			"k1": "vv1",
 			"k2": "vv2",
 			"k3": "vv3",
 		}
+		tagList = []string{"k1:vv1", "k2:vv2", "k3:vv3"}
 	)
 
 	// listen on the port, and wait for the health check to connect
@@ -133,7 +134,7 @@ func TestRegister(t *testing.T) {
 		ServiceName: testSvcName,
 		Weight:      testSvcWeight,
 		Addr:        testSvcAddr,
-		Tags:        metaList,
+		Tags:        tagMap,
 	}
 	err = cRegistry.Register(info)
 	assert.Nil(t, err)
@@ -148,17 +149,25 @@ func TestRegister(t *testing.T) {
 		assert.Equal(t, testSvcName, gotSvc.Service)
 		assert.Equal(t, testSvcAddr.String(), fmt.Sprintf("%s:%d", gotSvc.Address, gotSvc.Port))
 		assert.Equal(t, testSvcWeight, gotSvc.Weights.Passing)
-		assert.Equal(t, metaList, gotSvc.Meta)
+		assert.Equal(t, tagList, gotSvc.Tags)
 	}
 }
 
 // TestConsulDiscovery tests the ConsulDiscovery function.
 func TestConsulDiscovery(t *testing.T) {
 	var (
-		testSvcName   = strconv.Itoa(int(time.Now().Unix())) + ".svc.local"
+		testSvcName = strconv.Itoa(int(time.Now().Unix())) + ".svc.local"
+
 		testSvcPort   = 8082
 		testSvcWeight = 777
-		ctx           = context.Background()
+
+		ctx = context.Background()
+
+		tagMap = map[string]string{
+			"k1": "v1",
+			"k2": "v22",
+			"k3": "v333",
+		}
 	)
 	// listen on the port, and wait for the health check to connect
 	addr := fmt.Sprintf("%s:%d", localIpAddr, testSvcPort)
@@ -174,6 +183,7 @@ func TestConsulDiscovery(t *testing.T) {
 		ServiceName: testSvcName,
 		Weight:      testSvcWeight,
 		Addr:        testSvcAddr,
+		Tags:        tagMap,
 	}
 	err = cRegistry.Register(info)
 	assert.Nil(t, err)
@@ -187,6 +197,18 @@ func TestConsulDiscovery(t *testing.T) {
 		instance := result.Instances[0]
 		assert.Equal(t, testSvcWeight, instance.Weight())
 		assert.Equal(t, testSvcAddr.String(), instance.Address().String())
+		v1, ok := instance.Tag("k1")
+		if assert.Equal(t, ok, true) {
+			assert.Equal(t, "v1", v1)
+		}
+		v2, ok := instance.Tag("k2")
+		if assert.Equal(t, ok, true) {
+			assert.Equal(t, "v22", v2)
+		}
+		v3, ok := instance.Tag("k3")
+		if assert.Equal(t, ok, true) {
+			assert.Equal(t, "v333", v3)
+		}
 	}
 }
 

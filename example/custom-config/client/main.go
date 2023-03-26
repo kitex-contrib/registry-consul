@@ -23,10 +23,10 @@ import (
 
 	consulapi "github.com/hashicorp/consul/api"
 
-	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api"
-	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api/hello"
 	"github.com/cloudwego/kitex/client"
 	consul "github.com/kitex-contrib/registry-consul"
+	"github.com/kitex-contrib/registry-consul/example/hello/kitex_gen/api"
+	"github.com/kitex-contrib/registry-consul/example/hello/kitex_gen/api/hello"
 )
 
 func main() {

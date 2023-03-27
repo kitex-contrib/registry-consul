@@ -38,7 +38,7 @@ const kvJoinChar = ":"
 
 var _ registry.Registry = (*consulRegistry)(nil)
 
-var errillegalTagChar = errors.New("illegal tag character")
+var errIllegalTagChar = errors.New("illegal tag character")
 
 // Option is consul option.
 type Option func(o *options)
@@ -95,12 +95,9 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 		return err
 	}
 
-	var svcTags []string
-	for k, v := range info.Tags {
-		if strings.Contains(k, kvJoinChar) || strings.Contains(v, kvJoinChar) {
-			return errillegalTagChar
-		}
-		svcTags = append(svcTags, fmt.Sprintf("%s%s%s", k, kvJoinChar, v))
+	tagSlice, err := convTagMapToSlice(info.Tags)
+	if err != nil {
+		return err
 	}
 
 	svcInfo := &api.AgentServiceRegistration{
@@ -108,7 +105,7 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 		Address: host,
 		Port:    port,
 		Name:    info.ServiceName,
-		Tags:    svcTags,
+		Tags:    tagSlice,
 		Weights: &api.AgentWeights{
 			Passing: info.Weight,
 			Warning: info.Weight,
@@ -150,4 +147,17 @@ func defaultCheck() *api.AgentServiceCheck {
 	check.DeregisterCriticalServiceAfter = "1m"
 
 	return check
+}
+
+// convTagMapToSlice Tags map be convert to slice.
+// Keys or values must not contain `:`.
+func convTagMapToSlice(tagMap map[string]string) ([]string, error) {
+	svcTags := make([]string, 0, len(tagMap))
+	for k, v := range tagMap {
+		if strings.Contains(k, kvJoinChar) || strings.Contains(v, kvJoinChar) {
+			return svcTags, errIllegalTagChar
+		}
+		svcTags = append(svcTags, fmt.Sprintf("%s%s%s", k, kvJoinChar, v))
+	}
+	return svcTags, nil
 }

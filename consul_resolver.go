@@ -106,6 +106,8 @@ func (c *consulResolver) Name() string {
 	return "consul"
 }
 
+// splitTags Tags characters be separated to map.
+// we have konwn the characters only contain the one `:`, look at convTagMapToSlice.
 func splitTags(tags []string) map[string]string {
 	n := len(tags)
 	tagMap := make(map[string]string, n)

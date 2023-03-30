@@ -49,7 +49,7 @@ func TestSplitTags(t *testing.T) {
 			args: args{
 				tags: []string{"k1:v1:vv1", "k2:v2"},
 			},
-			want: map[string]string{"k1": "v1", "k2": "v2"},
+			want: map[string]string{"k1": "v1:vv1", "k2": "v2"},
 		},
 	}
 	for _, tt := range tests {

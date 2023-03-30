@@ -116,14 +116,15 @@ func splitTags(tags []string) map[string]string {
 	}
 
 	for _, tag := range tags {
-		strArr := strings.Split(tag, kvJoinChar)
-		switch len(strArr) {
-		case 0:
+		if tag == "" {
 			continue
+		}
+		strArr := strings.SplitN(tag, kvJoinChar, 2)
+		switch len(strArr) {
 		case 1:
 			key := strArr[0]
 			tagMap[key] = ""
-		default:
+		case 2:
 			key := strArr[0]
 			tagMap[key] = strArr[1]
 		}

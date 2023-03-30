@@ -154,7 +154,7 @@ func defaultCheck() *api.AgentServiceCheck {
 func convTagMapToSlice(tagMap map[string]string) ([]string, error) {
 	svcTags := make([]string, 0, len(tagMap))
 	for k, v := range tagMap {
-		if strings.Contains(k, kvJoinChar) || strings.Contains(v, kvJoinChar) {
+		if strings.Contains(k, kvJoinChar) {
 			return svcTags, errIllegalTagChar
 		}
 		svcTags = append(svcTags, fmt.Sprintf("%s%s%s", k, kvJoinChar, v))

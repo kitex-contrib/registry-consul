@@ -150,7 +150,7 @@ func defaultCheck() *api.AgentServiceCheck {
 }
 
 // convTagMapToSlice Tags map be convert to slice.
-// Keys or values must not contain `:`.
+// Keys must not contain `:`.
 func convTagMapToSlice(tagMap map[string]string) ([]string, error) {
 	svcTags := make([]string, 0, len(tagMap))
 	for k, v := range tagMap {

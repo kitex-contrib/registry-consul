@@ -107,7 +107,6 @@ func (c *consulResolver) Name() string {
 }
 
 // splitTags Tags characters be separated to map.
-// Look at convTagMapToSlice,we know the characters contain only one `:`.
 func splitTags(tags []string) map[string]string {
 	n := len(tags)
 	tagMap := make(map[string]string, n)
@@ -120,8 +119,7 @@ func splitTags(tags []string) map[string]string {
 			continue
 		}
 		strArr := strings.SplitN(tag, kvJoinChar, 2)
-		switch len(strArr) {
-		case 2:
+		if len(strArr) == 2 {
 			key := strArr[0]
 			tagMap[key] = strArr[1]
 		}

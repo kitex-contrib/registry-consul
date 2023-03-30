@@ -121,9 +121,6 @@ func splitTags(tags []string) map[string]string {
 		}
 		strArr := strings.SplitN(tag, kvJoinChar, 2)
 		switch len(strArr) {
-		case 1:
-			key := strArr[0]
-			tagMap[key] = ""
 		case 2:
 			key := strArr[0]
 			tagMap[key] = strArr[1]

@@ -1,16 +1,18 @@
-// Copyright 2021 CloudWeGo Authors.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Copyright 2021 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package consul
 
@@ -18,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"strings"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -67,22 +69,23 @@ func (c *consulResolver) Resolve(_ context.Context, desc string) (discovery.Resu
 	var eps []discovery.Instance
 	agentServiceList, _, err := c.consulClient.Health().Service(desc, "", true, nil)
 	if err != nil {
-		log.Printf("err:%v", err)
 		return discovery.Result{}, err
 	}
 	if len(agentServiceList) == 0 {
 		return discovery.Result{}, errors.New("no service found")
 	}
+
 	for _, i := range agentServiceList {
 		svc := i.Service
 		if svc == nil || svc.Address == "" {
 			continue
 		}
+
 		eps = append(eps, discovery.NewInstance(
 			defaultNetwork,
 			fmt.Sprint(svc.Address, ":", svc.Port),
 			svc.Weights.Passing,
-			svc.Meta,
+			splitTags(svc.Tags),
 		))
 	}
 
@@ -101,4 +104,26 @@ func (c *consulResolver) Diff(cacheKey string, prev, next discovery.Result) (dis
 // Name return the name of this resolver.
 func (c *consulResolver) Name() string {
 	return "consul"
+}
+
+// splitTags Tags characters be separated to map.
+func splitTags(tags []string) map[string]string {
+	n := len(tags)
+	tagMap := make(map[string]string, n)
+	if n == 0 {
+		return tagMap
+	}
+
+	for _, tag := range tags {
+		if tag == "" {
+			continue
+		}
+		strArr := strings.SplitN(tag, kvJoinChar, 2)
+		if len(strArr) == 2 {
+			key := strArr[0]
+			tagMap[key] = strArr[1]
+		}
+	}
+
+	return tagMap
 }

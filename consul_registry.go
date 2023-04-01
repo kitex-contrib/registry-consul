@@ -1,37 +1,44 @@
-// Copyright 2021 CloudWeGo Authors.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Copyright 2021 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package consul
 
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/hashicorp/consul/api"
 )
+
+type options struct {
+	check *api.AgentServiceCheck
+}
 
 type consulRegistry struct {
 	consulClient *api.Client
 	opts         options
 }
 
+const kvJoinChar = ":"
+
 var _ registry.Registry = (*consulRegistry)(nil)
 
-type options struct {
-	check *api.AgentServiceCheck
-}
+var errIllegalTagChar = errors.New("illegal tag character")
 
 // Option is consul option.
 type Option func(o *options)
@@ -80,6 +87,7 @@ func NewConsulRegisterWithConfig(config *api.Config, opts ...Option) (*consulReg
 }
 
 // Register register a service to consul.
+// Note: the tag map of the service can not contain the `:` character.
 func (c *consulRegistry) Register(info *registry.Info) error {
 	if err := validateRegistryInfo(info); err != nil {
 		return err
@@ -89,16 +97,23 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 	if err != nil {
 		return err
 	}
+
 	svcID, err := getServiceId(info)
 	if err != nil {
 		return err
 	}
+
+	tagSlice, err := convTagMapToSlice(info.Tags)
+	if err != nil {
+		return err
+	}
+
 	svcInfo := &api.AgentServiceRegistration{
 		ID:      svcID,
 		Address: host,
 		Port:    port,
 		Name:    info.ServiceName,
-		Meta:    info.Tags,
+		Tags:    tagSlice,
 		Weights: &api.AgentWeights{
 			Passing: info.Weight,
 			Warning: info.Weight,
@@ -140,4 +155,17 @@ func defaultCheck() *api.AgentServiceCheck {
 	check.DeregisterCriticalServiceAfter = "1m"
 
 	return check
+}
+
+// convTagMapToSlice Tags map be convert to slice.
+// Keys must not contain `:`.
+func convTagMapToSlice(tagMap map[string]string) ([]string, error) {
+	svcTags := make([]string, 0, len(tagMap))
+	for k, v := range tagMap {
+		if strings.Contains(k, kvJoinChar) {
+			return svcTags, errIllegalTagChar
+		}
+		svcTags = append(svcTags, fmt.Sprintf("%s%s%s", k, kvJoinChar, v))
+	}
+	return svcTags, nil
 }

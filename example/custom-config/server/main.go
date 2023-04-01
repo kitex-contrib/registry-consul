@@ -18,12 +18,11 @@ import (
 	"context"
 	"log"
 
-	consulapi "github.com/hashicorp/consul/api"
-
 	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api"
 	"github.com/cloudwego/kitex-examples/hello/kitex_gen/api/hello"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/server"
+	consulapi "github.com/hashicorp/consul/api"
 	consul "github.com/kitex-contrib/registry-consul"
 )
 
@@ -41,7 +40,11 @@ func main() {
 		Address: "127.0.0.1:8500",
 		Token:   "TEST-MY-TOKEN",
 	}
-	r, err := consul.NewConsulRegisterWithConfig(&consulConfig)
+	r, err := consul.NewConsulRegisterWithConfig(&consulConfig, consul.WithCheck(&consulapi.AgentServiceCheck{
+		Interval:                       "7s",
+		Timeout:                        "5s",
+		DeregisterCriticalServiceAfter: "15s",
+	}))
 	if err != nil {
 		log.Fatal(err)
 	}

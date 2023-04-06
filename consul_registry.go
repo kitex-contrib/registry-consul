@@ -69,13 +69,21 @@ func NewConsulRegister(address string, opts ...Option) (registry.Registry, error
 }
 
 // NewConsulRegisterWithConfig create a new registry using consul, with a custom config.
-func NewConsulRegisterWithConfig(config *api.Config) (*consulRegistry, error) {
+func NewConsulRegisterWithConfig(config *api.Config, opts ...Option) (*consulRegistry, error) {
 	client, err := api.NewClient(config)
 	if err != nil {
 		return nil, err
 	}
 
-	return &consulRegistry{consulClient: client}, nil
+	op := options{
+		check: defaultCheck(),
+	}
+
+	for _, option := range opts {
+		option(&op)
+	}
+
+	return &consulRegistry{consulClient: client, opts: op}, nil
 }
 
 // Register register a service to consul.

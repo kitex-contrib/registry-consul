@@ -43,7 +43,11 @@ func main() {
 		Address: "127.0.0.1:8500",
 		Token:   "TEST-MY-TOKEN",
 	}
-	r, err := consul.NewConsulRegisterWithConfig(&consulConfig)
+	r, err := consul.NewConsulRegisterWithConfig(&consulConfig, consul.WithCheck(&consulapi.AgentServiceCheck{
+		Interval:                       "7s",
+		Timeout:                        "5s",
+		DeregisterCriticalServiceAfter: "15s",
+	}))
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -81,7 +81,11 @@ func TestNewConsulRegisterWithConfig(t *testing.T) {
 		Address:   consulAddr,
 		WaitTime:  5 * time.Second,
 		Namespace: "TEST-NS",
-	})
+	}, WithCheck(&consulapi.AgentServiceCheck{
+		Interval:                       "7s",
+		Timeout:                        "5s",
+		DeregisterCriticalServiceAfter: "15s",
+	}))
 	assert.NoError(t, err)
 }
 

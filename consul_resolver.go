@@ -17,13 +17,10 @@
 package consul
 
 import (
-	"context"
-	"errors"
-	"fmt"
 	"strings"
 
+	consuleesolver "github.com/cloudwego-contrib/cwgo-pkg/registry/consul/consulkitex"
 	"github.com/cloudwego/kitex/pkg/discovery"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/hashicorp/consul/api"
 )
 
@@ -31,79 +28,14 @@ const (
 	defaultNetwork = "tcp"
 )
 
-type consulResolver struct {
-	consulClient *api.Client
-}
-
-var _ discovery.Resolver = (*consulResolver)(nil)
-
 // NewConsulResolver create a service resolver using consul.
 func NewConsulResolver(address string) (discovery.Resolver, error) {
-	config := api.DefaultConfig()
-	config.Address = address
-	client, err := api.NewClient(config)
-	if err != nil {
-		return nil, err
-	}
-
-	return &consulResolver{consulClient: client}, nil
+	return consuleesolver.NewConsulResolver(address)
 }
 
 // NewConsulResolverWithConfig create a service resolver using consul, with a custom config.
 func NewConsulResolverWithConfig(config *api.Config) (discovery.Resolver, error) {
-	client, err := api.NewClient(config)
-	if err != nil {
-		return nil, err
-	}
-
-	return &consulResolver{consulClient: client}, nil
-}
-
-// Target return a description for the given target that is suitable for being a key for cache.
-func (c *consulResolver) Target(_ context.Context, target rpcinfo.EndpointInfo) (description string) {
-	return target.ServiceName()
-}
-
-// Resolve a service info by desc.
-func (c *consulResolver) Resolve(_ context.Context, desc string) (discovery.Result, error) {
-	var eps []discovery.Instance
-	agentServiceList, _, err := c.consulClient.Health().Service(desc, "", true, nil)
-	if err != nil {
-		return discovery.Result{}, err
-	}
-	if len(agentServiceList) == 0 {
-		return discovery.Result{}, errors.New("no service found")
-	}
-
-	for _, i := range agentServiceList {
-		svc := i.Service
-		if svc == nil || svc.Address == "" {
-			continue
-		}
-
-		eps = append(eps, discovery.NewInstance(
-			defaultNetwork,
-			fmt.Sprint(svc.Address, ":", svc.Port),
-			svc.Weights.Passing,
-			splitTags(svc.Tags),
-		))
-	}
-
-	return discovery.Result{
-		Cacheable: true,
-		CacheKey:  desc,
-		Instances: eps,
-	}, nil
-}
-
-// Diff computes the difference between two results.
-func (c *consulResolver) Diff(cacheKey string, prev, next discovery.Result) (discovery.Change, bool) {
-	return discovery.DefaultDiff(cacheKey, prev, next)
-}
-
-// Name return the name of this resolver.
-func (c *consulResolver) Name() string {
-	return "consul"
+	return consuleesolver.NewConsulResolverWithConfig(config)
 }
 
 // splitTags Tags characters be separated to map.

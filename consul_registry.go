@@ -18,6 +18,7 @@ package consul
 
 import (
 	"errors"
+
 	consulregistry "github.com/cloudwego-contrib/cwgo-pkg/registry/consul/consulkitex"
 	"github.com/cloudwego-contrib/cwgo-pkg/registry/consul/options"
 	"github.com/cloudwego/kitex/pkg/registry"

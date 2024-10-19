@@ -24,10 +24,6 @@ import (
 	"github.com/hashicorp/consul/api"
 )
 
-const (
-	defaultNetwork = "tcp"
-)
-
 // NewConsulResolver create a service resolver using consul.
 func NewConsulResolver(address string) (discovery.Resolver, error) {
 	return consuleesolver.NewConsulResolver(address)

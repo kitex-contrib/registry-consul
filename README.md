@@ -5,7 +5,8 @@
 ### Server
 
 #### Basic Usage
-```
+
+```go
 import (
     ...
     "github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -43,14 +44,15 @@ check.DeregisterCriticalServiceAfter = "1m"
 
 you can also use `WithCheck` to modify your service check setting
 
-```
+```go
 import (
 	...
 	consul "github.com/kitex-contrib/registry-consul"
 	consulapi "github.com/hashicorp/consul/api"
 )
+
 func main() {
-    ...
+	...
 	r, err := consul.NewConsulRegister("127.0.0.1:8500", consul.WithCheck(&consulapi.AgentServiceCheck{
             Interval:                       "7s",
             Timeout:                        "5s",
@@ -70,14 +72,15 @@ config.Scheme = "http"
 
 you can also use `NewConsulRegisterWithConfig` to modify your config
 
-```
+```go
 import (
 	...
 	consul "github.com/kitex-contrib/registry-consul"
 	consulapi "github.com/hashicorp/consul/api"
 )
+
 func main() {
-    ...
+	...
 	consulConfig := consulapi.Config{
 		Address: "127.0.0.1:8500",
 		Scheme:  "https"
@@ -91,7 +94,7 @@ func main() {
 
 #### Basic Usage
 
-```
+```go
 import (
     ...
     "github.com/cloudwego/kitex/client"
@@ -124,14 +127,15 @@ config.Scheme = "http"
 
 you can also use `NewConsulResolverWithConfig` to modify your config
 
-```
+```go
 import (
 	...
 	consul "github.com/kitex-contrib/registry-consul"
 	consulapi "github.com/hashicorp/consul/api"
 )
+
 func main() {
-    ...
+	...
 	consulConfig := consulapi.Config{
 		Address: "127.0.0.1:8500",
 		Scheme:  "https"
@@ -143,7 +147,7 @@ func main() {
 
 ## Example
 
-See Server and Client in example/basic or example/custom-config.
+See Server and Client in [example/basic](https://github.com/kitex-contrib/registry-consul/tree/main/example/basic) or [example/custom-config](https://github.com/kitex-contrib/registry-consul/tree/main/example/custom-config).
 
 ## Compatibility
 

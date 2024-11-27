@@ -44,6 +44,7 @@ var errIllegalTagChar = errors.New("illegal tag character")
 type Option func(o *options)
 
 // WithCheck is consul registry option to set AgentServiceCheck.
+// If disable consul check, set the check option to nil.
 func WithCheck(check *api.AgentServiceCheck) Option {
 	return func(o *options) { o.check = check }
 }
@@ -75,6 +76,19 @@ func NewConsulRegisterWithConfig(config *api.Config, opts ...Option) (*consulReg
 		return nil, err
 	}
 
+	op := options{
+		check: defaultCheck(),
+	}
+
+	for _, option := range opts {
+		option(&op)
+	}
+
+	return &consulRegistry{consulClient: client, opts: op}, nil
+}
+
+// NewConsulRegisterWithClient create a new registry using consul, with client.
+func NewConsulRegisterWithClient(client *api.Client, opts ...Option) (*consulRegistry, error) {
 	op := options{
 		check: defaultCheck(),
 	}

@@ -89,6 +89,16 @@ func TestNewConsulRegisterWithConfig(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TestNewConsulRegisterWithConfig tests the NewConsulRegisterWithConfig function.
+func TestNewConsulRegisterWithClient(t *testing.T) {
+	_, err := NewConsulRegisterWithClient(consulClient, WithCheck(&consulapi.AgentServiceCheck{
+		Interval:                       "7s",
+		Timeout:                        "5s",
+		DeregisterCriticalServiceAfter: "15s",
+	}))
+	assert.NoError(t, err)
+}
+
 // TestNewConsulResolver tests the NewConsulResolver function.
 func TestNewConsulResolver(t *testing.T) {
 	_, err := NewConsulResolver(consulAddr)

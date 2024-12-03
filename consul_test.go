@@ -23,6 +23,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -147,7 +148,6 @@ func TestRegister(t *testing.T) {
 			"k2": "vv2",
 			"k3": "vv3",
 		}
-		tagList = []string{"k1:vv1", "k2:vv2", "k3:vv3"}
 	)
 
 	// listen on the port, and wait for the health check to connect
@@ -179,7 +179,12 @@ func TestRegister(t *testing.T) {
 		assert.Equal(t, testSvcName, gotSvc.Service)
 		assert.Equal(t, testSvcAddr.String(), fmt.Sprintf("%s:%d", gotSvc.Address, gotSvc.Port))
 		assert.Equal(t, testSvcWeight, gotSvc.Weights.Passing)
-		assert.Equal(t, tagList, gotSvc.Tags)
+		assert.Equal(t, len(tagMap), len(gotSvc.Tags))
+		for _, tag := range gotSvc.Tags {
+			kv := strings.Split(tag, ":")
+			k, v := kv[0], kv[1]
+			assert.Equal(t, tagMap[k], v)
+		}
 	}
 }
 
@@ -187,14 +192,13 @@ func TestRegister(t *testing.T) {
 func TestRegisterWithTTLCheck(t *testing.T) {
 	var (
 		testSvcName   = strconv.Itoa(int(time.Now().Unix())) + ".svc.local"
-		testSvcPort   = 8081
+		testSvcPort   = 8085
 		testSvcWeight = 777
 		tagMap        = map[string]string{
 			"k1": "vv1",
 			"k2": "vv2",
 			"k3": "vv3",
 		}
-		tagList = []string{"k1:vv1", "k2:vv2", "k3:vv3"}
 	)
 
 	// listen on the port, and wait for the health check to connect
@@ -226,7 +230,12 @@ func TestRegisterWithTTLCheck(t *testing.T) {
 		assert.Equal(t, testSvcName, gotSvc.Service)
 		assert.Equal(t, testSvcAddr.String(), fmt.Sprintf("%s:%d", gotSvc.Address, gotSvc.Port))
 		assert.Equal(t, testSvcWeight, gotSvc.Weights.Passing)
-		assert.Equal(t, tagList, gotSvc.Tags)
+		assert.Equal(t, len(tagMap), len(gotSvc.Tags))
+		for _, tag := range gotSvc.Tags {
+			kv := strings.Split(tag, ":")
+			k, v := kv[0], kv[1]
+			assert.Equal(t, tagMap[k], v)
+		}
 	}
 }
 

@@ -220,21 +220,24 @@ func TestRegisterWithTTLCheck(t *testing.T) {
 	err = cRegistryWithTTL.Register(info)
 	assert.Nil(t, err)
 	// wait for health check passing
-	time.Sleep(time.Second * 6)
 
-	list, _, err := consulClient.Health().Service(testSvcName, "", true, nil)
-	assert.Nil(t, err)
-	if assert.Equal(t, 1, len(list)) {
-		ss := list[0]
-		gotSvc := ss.Service
-		assert.Equal(t, testSvcName, gotSvc.Service)
-		assert.Equal(t, testSvcAddr.String(), fmt.Sprintf("%s:%d", gotSvc.Address, gotSvc.Port))
-		assert.Equal(t, testSvcWeight, gotSvc.Weights.Passing)
-		assert.Equal(t, len(tagMap), len(gotSvc.Tags))
-		for _, tag := range gotSvc.Tags {
-			kv := strings.Split(tag, ":")
-			k, v := kv[0], kv[1]
-			assert.Equal(t, tagMap[k], v)
+	var list []*consulapi.ServiceEntry
+	for i := 0; i < 3; i++ {
+		time.Sleep(time.Second * 5)
+		list, _, err = consulClient.Health().Service(testSvcName, "", true, nil)
+		assert.Nil(t, err)
+		if assert.Equal(t, 1, len(list)) {
+			ss := list[0]
+			gotSvc := ss.Service
+			assert.Equal(t, testSvcName, gotSvc.Service)
+			assert.Equal(t, testSvcAddr.String(), fmt.Sprintf("%s:%d", gotSvc.Address, gotSvc.Port))
+			assert.Equal(t, testSvcWeight, gotSvc.Weights.Passing)
+			assert.Equal(t, len(tagMap), len(gotSvc.Tags))
+			for _, tag := range gotSvc.Tags {
+				kv := strings.Split(tag, ":")
+				k, v := kv[0], kv[1]
+				assert.Equal(t, tagMap[k], v)
+			}
 		}
 	}
 }

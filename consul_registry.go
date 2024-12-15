@@ -144,17 +144,25 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 		svcInfo.Check = c.opts.check
 	}
 
+	var ttl time.Duration
+	if c.opts.check.TTL != "" {
+		ttl, err = time.ParseDuration(c.opts.check.TTL)
+		if err != nil {
+			return err
+		}
+		if ttl <= time.Second {
+			return errors.New("consul check ttl must be greater than one second")
+		}
+	}
+
 	if err := c.consulClient.Agent().ServiceRegister(svcInfo); err != nil {
 		return err
 	}
 
 	if c.opts.check.TTL != "" {
-		if ttl, err := time.ParseDuration(c.opts.check.TTL); err != nil {
-			return err
-		} else {
-			return c.startTTLHeartbeat(ttl)
-		}
+		c.startTTLHeartbeat(ttl)
 	}
+
 	return nil
 }
 
@@ -165,18 +173,20 @@ func (c *consulRegistry) Deregister(info *registry.Info) error {
 		return err
 	}
 
-	if c.cancelUpdateTTL != nil {
-		defer c.cancelUpdateTTL()
+	err = c.consulClient.Agent().ServiceDeregister(svcID)
+	if err != nil {
+		return err
 	}
-	return c.consulClient.Agent().ServiceDeregister(svcID)
+
+	if c.cancelUpdateTTL != nil {
+		c.cancelUpdateTTL()
+	}
+
+	return nil
 }
 
 // startTTLHeartbeat start a goroutine to periodically update TTL.
-func (c *consulRegistry) startTTLHeartbeat(ttl time.Duration) error {
-	if ttl <= 1*time.Second {
-		return errors.New("consul check ttl must be greater than one second")
-	}
-
+func (c *consulRegistry) startTTLHeartbeat(ttl time.Duration) {
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancelUpdateTTL = cancel
 	go func() {
@@ -196,7 +206,6 @@ func (c *consulRegistry) startTTLHeartbeat(ttl time.Duration) error {
 			}
 		}
 	}()
-	return nil
 }
 
 func validateRegistryInfo(info *registry.Info) error {

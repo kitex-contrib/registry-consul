@@ -17,10 +17,13 @@
 package consul
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/hashicorp/consul/api"
 )
@@ -30,8 +33,9 @@ type options struct {
 }
 
 type consulRegistry struct {
-	consulClient *api.Client
-	opts         options
+	consulClient    *api.Client
+	opts            options
+	cancelUpdateTTL context.CancelFunc
 }
 
 const kvJoinChar = ":"
@@ -135,12 +139,31 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 		Check: c.opts.check,
 	}
 
-	if c.opts.check != nil {
+	if c.opts.check != nil && c.opts.check.TTL == "" {
 		c.opts.check.TCP = fmt.Sprintf("%s:%d", host, port)
 		svcInfo.Check = c.opts.check
 	}
 
-	return c.consulClient.Agent().ServiceRegister(svcInfo)
+	var ttl time.Duration
+	if c.opts.check.TTL != "" {
+		ttl, err = time.ParseDuration(c.opts.check.TTL)
+		if err != nil {
+			return err
+		}
+		if ttl <= time.Second {
+			return errors.New("consul check ttl must be greater than one second")
+		}
+	}
+
+	if err := c.consulClient.Agent().ServiceRegister(svcInfo); err != nil {
+		return err
+	}
+
+	if c.opts.check.TTL != "" {
+		c.startTTLHeartbeat(ttl)
+	}
+
+	return nil
 }
 
 // Deregister deregister a service from consul.
@@ -149,7 +172,40 @@ func (c *consulRegistry) Deregister(info *registry.Info) error {
 	if err != nil {
 		return err
 	}
-	return c.consulClient.Agent().ServiceDeregister(svcID)
+
+	err = c.consulClient.Agent().ServiceDeregister(svcID)
+	if err != nil {
+		return err
+	}
+
+	if c.cancelUpdateTTL != nil {
+		c.cancelUpdateTTL()
+	}
+
+	return nil
+}
+
+// startTTLHeartbeat start a goroutine to periodically update TTL.
+func (c *consulRegistry) startTTLHeartbeat(ttl time.Duration) {
+	ctx, cancel := context.WithCancel(context.Background())
+	c.cancelUpdateTTL = cancel
+	go func() {
+		if err := c.consulClient.Agent().UpdateTTL(c.opts.check.CheckID, "online", api.HealthPassing); err != nil {
+			klog.Errorf("update ttl to consul failed, err=%v", err)
+		}
+		ticker := time.NewTicker(ttl - 1*time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := c.consulClient.Agent().UpdateTTL(c.opts.check.CheckID, "online", api.HealthPassing); err != nil {
+					klog.Errorf("update ttl to consul failed, err=%v", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 }
 
 func validateRegistryInfo(info *registry.Info) error {

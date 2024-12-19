@@ -23,6 +23,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,10 +39,11 @@ const (
 )
 
 var (
-	consulClient *consulapi.Client
-	cRegistry    registry.Registry
-	cResolver    discovery.Resolver
-	localIpAddr  string
+	consulClient     *consulapi.Client
+	cRegistry        registry.Registry
+	cRegistryWithTTL registry.Registry
+	cResolver        discovery.Resolver
+	localIpAddr      string
 )
 
 func init() {
@@ -59,6 +61,19 @@ func init() {
 		return
 	}
 	cRegistry = r
+
+	r, err = NewConsulRegister(consulAddr, WithCheck(
+		&consulapi.AgentServiceCheck{
+			CheckID:                        "TEST-MY-CHECK-ID1",
+			TTL:                            "5s",
+			Timeout:                        "5s",
+			DeregisterCriticalServiceAfter: "1m",
+		},
+	))
+	if err != nil {
+		return
+	}
+	cRegistryWithTTL = r
 
 	resolver, err := NewConsulResolver(consulAddr)
 	if err != nil {
@@ -133,7 +148,6 @@ func TestRegister(t *testing.T) {
 			"k2": "vv2",
 			"k3": "vv3",
 		}
-		tagList = []string{"k1:vv1", "k2:vv2", "k3:vv3"}
 	)
 
 	// listen on the port, and wait for the health check to connect
@@ -165,7 +179,66 @@ func TestRegister(t *testing.T) {
 		assert.Equal(t, testSvcName, gotSvc.Service)
 		assert.Equal(t, testSvcAddr.String(), fmt.Sprintf("%s:%d", gotSvc.Address, gotSvc.Port))
 		assert.Equal(t, testSvcWeight, gotSvc.Weights.Passing)
-		assert.Equal(t, tagList, gotSvc.Tags)
+		assert.Equal(t, len(tagMap), len(gotSvc.Tags))
+		for _, tag := range gotSvc.Tags {
+			kv := strings.Split(tag, ":")
+			k, v := kv[0], kv[1]
+			assert.Equal(t, tagMap[k], v)
+		}
+	}
+}
+
+// TestRegisterWithTTLCheck tests the Register function with ttl check.
+func TestRegisterWithTTLCheck(t *testing.T) {
+	var (
+		testSvcName   = strconv.Itoa(int(time.Now().Unix())) + ".svc.local"
+		testSvcPort   = 8085
+		testSvcWeight = 777
+		tagMap        = map[string]string{
+			"k1": "vv1",
+			"k2": "vv2",
+			"k3": "vv3",
+		}
+	)
+
+	// listen on the port, and wait for the health check to connect
+	addr := fmt.Sprintf("%s:%d", localIpAddr, testSvcPort)
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Errorf("listen tcp %s failed!", addr)
+		t.Fail()
+	}
+	defer lis.Close()
+
+	testSvcAddr, _ := net.ResolveTCPAddr("tcp", addr)
+	info := &registry.Info{
+		ServiceName: testSvcName,
+		Weight:      testSvcWeight,
+		Addr:        testSvcAddr,
+		Tags:        tagMap,
+	}
+	err = cRegistryWithTTL.Register(info)
+	assert.Nil(t, err)
+	// wait for health check passing
+
+	var list []*consulapi.ServiceEntry
+	for i := 0; i < 3; i++ {
+		time.Sleep(time.Second * 5)
+		list, _, err = consulClient.Health().Service(testSvcName, "", true, nil)
+		assert.Nil(t, err)
+		if assert.Equal(t, 1, len(list)) {
+			ss := list[0]
+			gotSvc := ss.Service
+			assert.Equal(t, testSvcName, gotSvc.Service)
+			assert.Equal(t, testSvcAddr.String(), fmt.Sprintf("%s:%d", gotSvc.Address, gotSvc.Port))
+			assert.Equal(t, testSvcWeight, gotSvc.Weights.Passing)
+			assert.Equal(t, len(tagMap), len(gotSvc.Tags))
+			for _, tag := range gotSvc.Tags {
+				kv := strings.Split(tag, ":")
+				k, v := kv[0], kv[1]
+				assert.Equal(t, tagMap[k], v)
+			}
+		}
 	}
 }
 

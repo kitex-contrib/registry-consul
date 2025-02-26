@@ -29,13 +29,15 @@ import (
 )
 
 type options struct {
-	check *api.AgentServiceCheck
+	check            *api.AgentServiceCheck
+	registerInterval time.Duration
 }
 
 type consulRegistry struct {
-	consulClient    *api.Client
-	opts            options
-	cancelUpdateTTL context.CancelFunc
+	consulClient         *api.Client
+	opts                 options
+	cancelUpdateTTL      context.CancelFunc
+	cancelRegisterTicker context.CancelFunc
 }
 
 const kvJoinChar = ":"
@@ -51,6 +53,11 @@ type Option func(o *options)
 // If disable consul check, set the check option to nil.
 func WithCheck(check *api.AgentServiceCheck) Option {
 	return func(o *options) { o.check = check }
+}
+
+// WithRegisterInterval is consul registry option to set register interval.
+func WithRegisterInterval(interval time.Duration) Option {
+	return func(o *options) { o.registerInterval = interval }
 }
 
 // NewConsulRegister create a new registry using consul.
@@ -162,6 +169,9 @@ func (c *consulRegistry) Register(info *registry.Info) error {
 	if c.opts.check.TTL != "" {
 		c.startTTLHeartbeat(ttl)
 	}
+	if c.opts.registerInterval > time.Minute {
+		c.registerTimer(svcInfo)
+	}
 
 	return nil
 }
@@ -181,7 +191,9 @@ func (c *consulRegistry) Deregister(info *registry.Info) error {
 	if c.cancelUpdateTTL != nil {
 		c.cancelUpdateTTL()
 	}
-
+	if c.cancelRegisterTicker != nil {
+		c.cancelRegisterTicker()
+	}
 	return nil
 }
 
@@ -198,8 +210,33 @@ func (c *consulRegistry) startTTLHeartbeat(ttl time.Duration) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := c.consulClient.Agent().UpdateTTL(c.opts.check.CheckID, "online", api.HealthPassing); err != nil {
+				if err := c.consulClient.Agent().UpdateTTL(
+					c.opts.check.CheckID, "online", api.HealthPassing,
+				); err != nil {
 					klog.Errorf("update ttl to consul failed, err=%v", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+// registerTimer register a timer to periodically register service.
+func (c *consulRegistry) registerTimer(svcInfo *api.AgentServiceRegistration) {
+	if svcInfo == nil {
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	c.cancelRegisterTicker = cancel
+	registerTicker := time.NewTicker(c.opts.registerInterval)
+	defer registerTicker.Stop()
+	go func() {
+		for {
+			select {
+			case <-registerTicker.C:
+				if err := c.consulClient.Agent().ServiceRegister(svcInfo); err != nil {
+					klog.Errorf("register service to consul failed, err=%v", err)
 				}
 			case <-ctx.Done():
 				return

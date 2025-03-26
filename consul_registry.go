@@ -244,14 +244,14 @@ func (c *consulRegistry) registerTimer(svcInfo *api.AgentServiceRegistration) {
 		for {
 			select {
 			case <-registerTicker.C:
-				// Retry logic with exponential backoff
+				// Retry logic, just a simple retry logic to reduce the risk of service registration failure due to transient issues
 				var err error
 				for i := 0; i < 3; i++ { // Maximum 3 retries
 					if err = c.consulClient.Agent().ServiceRegister(svcInfo); err == nil {
 						break
 					}
 					klog.Errorf("register service to consul failed (attempt %d), err=%v", i+1, err)
-					time.Sleep(time.Duration(i*500) * time.Millisecond) // Exponential backoff
+					time.Sleep(time.Duration(i*500) * time.Millisecond)
 				}
 				if err != nil {
 					klog.Errorf("final attempt to register service failed, err=%v", err)

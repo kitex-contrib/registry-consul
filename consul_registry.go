@@ -227,18 +227,38 @@ func (c *consulRegistry) registerTimer(svcInfo *api.AgentServiceRegistration) {
 	if svcInfo == nil {
 		return
 	}
+
+	// Ensure the previous ticker is stopped if it exists
+	if c.cancelRegisterTicker != nil {
+		c.cancelRegisterTicker()
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancelRegisterTicker = cancel
+
 	registerTicker := time.NewTicker(c.opts.registerInterval)
-	defer registerTicker.Stop()
+
 	go func() {
+		defer registerTicker.Stop()
+
 		for {
 			select {
 			case <-registerTicker.C:
-				if err := c.consulClient.Agent().ServiceRegister(svcInfo); err != nil {
-					klog.Errorf("register service to consul failed, err=%v", err)
+				// Retry logic with exponential backoff
+				var err error
+				for i := 0; i < 3; i++ { // Maximum 3 retries
+					if err = c.consulClient.Agent().ServiceRegister(svcInfo); err == nil {
+						break
+					}
+					klog.Errorf("register service to consul failed (attempt %d), err=%v", i+1, err)
+					time.Sleep(time.Duration(i*500) * time.Millisecond) // Exponential backoff
 				}
+				if err != nil {
+					klog.Errorf("final attempt to register service failed, err=%v", err)
+				}
+
 			case <-ctx.Done():
+				klog.Info("stopping register timer")
 				return
 			}
 		}

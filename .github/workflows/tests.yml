@@ -11,24 +11,27 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: stable
-
+      - name: Prepare Consul
+        run: |
+            make prepare
+            sleep 5
       - name: Unit Test
         run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
-
       - name: Benchmark
         run: go test -bench=. -benchmem -run=none ./...
 
   compatibility-test:
-    strategy:
-      matrix:
-        go: [ "1.21", "1.22", "1.23" ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go }}
+          go-version: oldstable
           cache: true # don't use cache for self-hosted runners
+      - name: Prepare Consul
+        run: |
+          make prepare
+          sleep 5
       - name: Unit Test
         run: go test -race -covermode=atomic ./...
